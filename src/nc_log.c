@@ -117,15 +117,41 @@ log_loggable(int level)
     return 1;
 }
 
+const char *
+_log_level_str(int level)
+{
+    static const char * _level_str[] = {
+        " EMERG",
+        " ALERT",
+        " CRIT",
+        " ERROR",
+        " WARN",
+        " NOTICE",
+        " INFO",
+        " DEBUG",
+        " VERB",
+        " VVERB",
+        " VVVERB",
+        " PVERB"
+    };
+    if (level < 0 || level > LOG_PVERB) {
+        return "";
+    } else {
+        return _level_str[level];
+    }
+}
+
 void
-_log(const char *file, int line, int panic, const char *fmt, ...)
+_log(int level, const char *file, int line, int panic, const char *fmt, ...)
 {
     struct logger *l = &logger;
     int len, size, errno_save;
-    char buf[LOG_MAX_LEN], *timestr;
+    char buf[LOG_MAX_LEN];
+    char timestr[64];
     va_list args;
-    struct tm *local;
+    struct timeval tv;
     time_t t;
+    struct tm *local;
     ssize_t n;
 
     if (l->fd < 0) {
@@ -136,12 +162,14 @@ _log(const char *file, int line, int panic, const char *fmt, ...)
     len = 0;            /* length of output buffer */
     size = LOG_MAX_LEN; /* size of output buffer */
 
-    t = time(NULL);
+    gettimeofday(&tv,NULL);
+    t = tv.tv_sec;
     local = localtime(&t);
-    timestr = asctime(local);
+    strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", local);
 
-    len += nc_scnprintf(buf + len, size - len, "[%.*s] %s:%d ",
-                        strlen(timestr) - 1, timestr, file, line);
+    len += nc_scnprintf(buf + len, size - len, "%.*s.%06d%s %s:%d ",
+                        strlen(timestr), timestr, tv.tv_usec,
+                        _log_level_str(level), file, line);
 
     va_start(args, fmt);
     len += nc_vscnprintf(buf + len, size - len, fmt, args);
