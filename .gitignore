@@ -63,3 +63,7 @@ nutcracker
 
 Makefile
 Makefile.in
+
+# dev
+tags
+cscope.*
