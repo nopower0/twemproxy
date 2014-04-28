@@ -121,18 +121,18 @@ const char *
 _log_level_str(int level)
 {
     static const char * _level_str[] = {
-        " EMERG",
-        " ALERT",
-        " CRIT",
-        " ERROR",
-        " WARN",
-        " NOTICE",
-        " INFO",
-        " DEBUG",
-        " VERB",
-        " VVERB",
-        " VVVERB",
-        " PVERB"
+        " 0 EMERG",
+        " 1 ALERT",
+        " 2 CRIT",
+        " 3 ERROR",
+        " 4 WARN",
+        " 5 NOTICE",
+        " 6 INFO",
+        " 7 DEBUG",
+        " 8 VERB",
+        " 9 VVERB",
+        " 10 VVVERB",
+        " 11 PVERB"
     };
     if (level < 0 || level > LOG_PVERB) {
         return "";
