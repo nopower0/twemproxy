@@ -144,8 +144,9 @@ client_close(struct context *ctx, struct conn *conn)
         ASSERT(msg->request && !msg->done);
 
         log_debug(LOG_INFO, "close c %d discarding pending req %"PRIu64" len "
-                  "%"PRIu32" type %d frag %u/%u", conn->sd, msg->id, msg->mlen,
-                  msg->type, frag_idx, msg->frag_owner->nfrag);
+                  "%"PRIu32" type %d frag %u/%u", conn->sd, msg->id,
+                  msg->mlen, msg->type, frag_idx,
+                  (msg->frag_owner ? msg->frag_owner->nfrag : 0));
 
         frag_idx++;
         req_put(msg);
@@ -163,8 +164,9 @@ client_close(struct context *ctx, struct conn *conn)
         if (msg->done) {
             log_debug(LOG_INFO, "close c %d discarding %s req %"PRIu64" len "
                       "%"PRIu32" type %d frag %u/%u", conn->sd,
-                      msg->error ? "error": "completed", msg->id, msg->mlen,
-                      msg->type, frag_idx, msg->frag_owner->nfrag);
+                      msg->error ? "error": "completed", msg->id,
+                      msg->mlen, msg->type, frag_idx,
+                      (msg->frag_owner ? msg->frag_owner->nfrag : 0));
             req_put(msg);
         } else {
             msg->swallow = 1;
@@ -173,8 +175,9 @@ client_close(struct context *ctx, struct conn *conn)
             ASSERT(msg->peer == NULL);
 
             log_debug(LOG_INFO, "close c %d schedule swallow of req %"PRIu64" "
-                      "len %"PRIu32" type %d frag %u/%u", conn->sd, msg->id, msg->mlen,
-                      msg->type, frag_idx, msg->frag_owner->nfrag);
+                      "len %"PRIu32" type %d frag %u/%u", conn->sd, msg->id,
+                      msg->mlen, msg->type, frag_idx,
+                      (msg->frag_owner ? msg->frag_owner->nfrag : 0));
         }
         frag_idx++;
     }

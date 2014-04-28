@@ -422,7 +422,7 @@ msg_parsed(struct context *ctx, struct conn *conn, struct msg *msg)
      * Warning if the msg has too large fragments. Put this in other places?
      */
     if (conn->client && msg->frag_owner && msg->frag_owner->nfrag >= 1024) {
-        log_debug(LOG_NOTICE, "c %d '%s' msg %"PRIu64" has %u fragments",
+        log_debug(LOG_WARN, "c %d '%s' msg %"PRIu64" has %u fragments",
                   conn->sd, nc_unresolve_peer_desc(conn->sd),
                   msg->id, msg->frag_owner->nfrag);
     }
