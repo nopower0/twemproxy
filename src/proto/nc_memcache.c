@@ -1294,6 +1294,9 @@ memcache_pre_coalesce(struct msg *r)
         log_hexdump(LOG_ERROR, mbuf->pos, mbuf_length(mbuf), "rsp fragment "
                     "with unknown type %d", r->type);
         pr->error = 1;
+        if (pr->frag_owner) {
+            pr->frag_owner->nfrag_error++;
+        }
         pr->err = EINVAL;
         break;
     }

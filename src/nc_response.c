@@ -189,6 +189,9 @@ rsp_filter(struct context *ctx, struct conn *conn, struct msg *msg)
     if (pmsg->swallow) {
         conn->dequeue_outq(ctx, conn, pmsg);
         pmsg->done = 1;
+        if (pmsg->frag_owner) {
+            pmsg->frag_owner->nfrag_done++;
+        }
 
         log_info("swallow rsp %"PRIu64" len %"PRIu32" of req "
                  "%"PRIu64" on s %d", msg->id, msg->mlen, pmsg->id,
@@ -250,6 +253,9 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
 
     s_conn->dequeue_outq(ctx, s_conn, pmsg);
     pmsg->done = 1;
+    if (pmsg->frag_owner) {
+        pmsg->frag_owner->nfrag_done++;
+    }
 
     /* establish msg <-> pmsg (response <-> request) link */
     pmsg->peer = msg;
