@@ -109,6 +109,8 @@ struct stats {
     struct string       version;        /* version */
     struct string       uptime_str;     /* uptime string */
     struct string       timestamp_str;  /* timestamp string */
+    struct string       rusage_user_str;/* rusage user */
+    struct string       rusage_system_str;/* rusage user */
 
     volatile int        aggregate;      /* shadow (b) aggregate? */
     volatile int        updated;        /* current (a) updated? */

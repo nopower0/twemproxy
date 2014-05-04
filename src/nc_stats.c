@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/resource.h>
 
 #include <nc_core.h>
 #include <nc_server.h>
@@ -361,6 +362,14 @@ stats_create_buf(struct stats *st)
     size += int64_max_digits;
     size += key_value_extra;
 
+    size += st->rusage_user_str.len;
+    size += int64_max_digits + 1 + 6; /* tv_sec.tv_usec */
+    size += key_value_extra;
+
+    size += st->rusage_system_str.len;
+    size += int64_max_digits + 1 + 6; /* tv_sec.tv_usec */
+    size += key_value_extra;
+
     /* server pools */
     for (i = 0; i < array_n(&st->sum); i++) {
         struct stats_pool *stp = array_get(&st->sum, i);
@@ -470,6 +479,29 @@ stats_add_num(struct stats *st, struct string *key, int64_t val)
 }
 
 static rstatus_t
+stats_add_float(struct stats *st, struct string *key, float val)
+{
+    struct stats_buffer *buf;
+    uint8_t *pos;
+    size_t room;
+    int n;
+
+    buf = &st->buf;
+    pos = buf->data + buf->len;
+    room = buf->size - buf->len - 1;
+
+    n = nc_snprintf(pos, room, "\"%.*s\":%.6f, ", key->len, key->data,
+                    val);
+    if (n < 0 || n >= (int)room) {
+        return NC_ERROR;
+    }
+
+    buf->len += (size_t)n;
+
+    return NC_OK;
+}
+
+static rstatus_t
 stats_add_header(struct stats *st)
 {
     rstatus_t status;
@@ -504,6 +536,21 @@ stats_add_header(struct stats *st)
     }
 
     status = stats_add_num(st, &st->timestamp_str, cur_ts);
+    if (status != NC_OK) {
+        return status;
+    }
+
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+
+    status = stats_add_float(st, &st->rusage_user_str,
+       usage.ru_utime.tv_sec + (float)usage.ru_utime.tv_usec/1000000);
+    if (status != NC_OK) {
+        return status;
+    }
+
+    status = stats_add_float(st, &st->rusage_system_str,
+       usage.ru_stime.tv_sec + (float)usage.ru_stime.tv_usec/1000000);
     if (status != NC_OK) {
         return status;
     }
@@ -908,6 +955,8 @@ stats_create(uint16_t stats_port, char *stats_ip, int stats_interval,
 
     string_set_text(&st->uptime_str, "uptime");
     string_set_text(&st->timestamp_str, "timestamp");
+    string_set_text(&st->rusage_user_str, "rusage_user");
+    string_set_text(&st->rusage_system_str, "rusage_system");
 
     st->updated = 0;
     st->aggregate = 0;
