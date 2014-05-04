@@ -162,7 +162,7 @@ _log(int level, const char *file, int line, int panic, const char *fmt, ...)
     len = 0;            /* length of output buffer */
     size = LOG_MAX_LEN; /* size of output buffer */
 
-    gettimeofday(&tv,NULL);
+    gettimeofday(&tv, NULL);
     t = tv.tv_sec;
     local = localtime(&t);
     strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", local);
