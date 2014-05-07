@@ -1,5 +1,7 @@
 #!/bin/bash
 
+./build.sh
+
 bin_file=twemproxy
 if [[ ! -z "$1" && "$1" == "abtest" ]]; then
     bin_file=twemproxy-abtest
