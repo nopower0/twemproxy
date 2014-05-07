@@ -28,6 +28,8 @@
 #include <nc_conf.h>
 #include <nc_signal.h>
 
+#include "buildinfo.h"
+
 #define NC_CONF_PATH        "conf/nutcracker.yml"
 
 #define NC_LOG_DEFAULT      LOG_NOTICE
@@ -182,10 +184,12 @@ nc_print_run(struct instance *nci)
 
     status = uname(&name);
     if (status < 0) {
-        loga("nutcracker-%s started on pid %d", NC_VERSION_STRING, nci->pid);
+        loga("nutcracker-%s %s started on pid %d", NC_VERSION_STRING,
+             get_buildinfo(), nci->pid);
     } else {
-        loga("nutcracker-%s built for %s %s %s started on pid %d",
-             NC_VERSION_STRING, name.sysname, name.release, name.machine,
+        loga("nutcracker-%s %s built for %s %s %s started on pid %d",
+             NC_VERSION_STRING, get_buildinfo(),
+             name.sysname, name.release, name.machine,
              nci->pid);
     }
 
@@ -560,7 +564,7 @@ main(int argc, char **argv)
     }
 
     if (show_version) {
-        log_stderr("This is nutcracker-%s" CRLF, NC_VERSION_STRING);
+        log_stderr("This is nutcracker-%s %s" CRLF, NC_VERSION_STRING, get_buildinfo());
         if (show_help) {
             nc_show_usage();
         }

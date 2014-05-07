@@ -7,6 +7,7 @@ endif
 AM_CPPFLAGS += -I $(top_srcdir)/src/hashkit
 AM_CPPFLAGS += -I $(top_srcdir)/src/proto
 AM_CPPFLAGS += -I $(top_srcdir)/src/event
+AM_CPPFLAGS += -I $(top_srcdir)/src/buildinfo
 AM_CPPFLAGS += -I $(top_srcdir)/contrib/yaml-0.1.4/include
 
 AM_CFLAGS =
@@ -24,7 +25,7 @@ if OS_SOLARIS
 AM_LDFLAGS += -lnsl -lsocket
 endif
 
-SUBDIRS = hashkit proto event
+SUBDIRS = hashkit proto event buildinfo
 
 sbin_PROGRAMS = nutcracker
 
@@ -52,4 +53,5 @@ nutcracker_SOURCES =			\
 nutcracker_LDADD = $(top_builddir)/src/hashkit/libhashkit.a
 nutcracker_LDADD += $(top_builddir)/src/proto/libproto.a
 nutcracker_LDADD += $(top_builddir)/src/event/libevent.a
+nutcracker_LDADD += $(top_builddir)/src/buildinfo/buildinfo.o
 nutcracker_LDADD += $(top_builddir)/contrib/yaml-0.1.4/src/.libs/libyaml.a
