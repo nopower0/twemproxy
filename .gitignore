@@ -67,3 +67,4 @@ Makefile.in
 # dev
 tags
 cscope.*
+.gdbinit
