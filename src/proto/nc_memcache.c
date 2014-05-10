@@ -345,6 +345,11 @@ memcache_parse_req(struct msg *r)
                     }
                     p = p - 1; /* go back by 1 byte */
                 }
+            } else if (ch == '\0') {
+                log_error("parsed bad req %"PRIu64" of type %d with key "
+                          "prefix '%.*s...' and has \\0 in key",
+                          r->id, r->type, 16, r->key_start);
+                goto error;
             }
 
             break;
