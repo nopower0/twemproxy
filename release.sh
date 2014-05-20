@@ -2,7 +2,7 @@
 
 bin_file=twemproxy
 if [[ ! -z "$1" && "$1" == "abtest" ]]; then
-    bin_file=twemproxy_abtest
+    bin_file=twemproxy-abtest
 fi
 output_dir=../twemproxy_bin/bin
 if [[ -d $output_dir && -w $output_dir ]]; then
