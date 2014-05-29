@@ -424,7 +424,7 @@ nc_usec_now(void)
 
     status = gettimeofday(&now, NULL);
     if (status < 0) {
-        log_error("gettimeofday failed: %s", strerror(errno));
+        log_error("gettimeofday failed: %d @ %s", status, strerror(errno));
         return -1;
     }
 
@@ -563,6 +563,7 @@ nc_unresolve_addr(struct sockaddr *addr, socklen_t addrlen)
                          service, sizeof(service),
                          NI_NUMERICHOST | NI_NUMERICSERV);
     if (status < 0) {
+        log_error("getnameinfo failed: %d @ %s", status, strerror(errno));
         return "unknown";
     }
 
@@ -591,6 +592,7 @@ nc_unresolve_peer_desc(int sd)
 
     status = getpeername(sd, addr, &addrlen);
     if (status < 0) {
+        log_error("getpeername failed: %d @ %s", status, strerror(errno));
         return "unknown";
     }
 
@@ -617,6 +619,7 @@ nc_unresolve_desc(int sd)
 
     status = getsockname(sd, addr, &addrlen);
     if (status < 0) {
+        log_error("getsockname failed: %d @ %s", status, strerror(errno));
         return "unknown";
     }
 
