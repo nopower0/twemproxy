@@ -23,16 +23,19 @@
 #include <fcntl.h>
 
 #include <nc_core.h>
+#include <nc_util.h>
 
 static struct logger logger;
 
 int
-log_init(int level, char *name)
+log_init(int level, char *name, int log_limit)
 {
     struct logger *l = &logger;
 
     l->level = MAX(LOG_EMERG, MIN(level, LOG_PVERB));
     l->name = name;
+    l->limit = log_limit;
+    memset(l->count, 0, sizeof(l->count));
     if (name == NULL || !strlen(name)) {
         l->fd = STDERR_FILENO;
     } else {
@@ -141,6 +144,46 @@ _log_level_str(int level)
     }
 }
 
+#define POSITIVE(n) ((n) > 0 ? (n) : 0)
+bool
+_log_reach_limit(int level, int64_t usec)
+{
+    struct logger *l = &logger;
+    int suppressed;
+    int i;
+
+    /* control limit ever 100ms */
+    if (usec / 100000 > l->last_time / 100000) {
+        suppressed = 0;
+        i = 0;
+        for (i = 0; i < LOG_N_LEVEL; ++i) {
+            suppressed += POSITIVE(l->count[i] - l->limit);
+        }
+        if (suppressed > 0) {
+            loga("[LOG SUPPRESSED: 0:%d, 1:%d, 2:%d, 3:%d, 4:%d, 5:%d, "
+                "6:%d, 7:%d, 8:%d, 9:%d, 10:%d, 11:%d]",
+                POSITIVE(l->count[0] - l->limit), POSITIVE(l->count[1] - l->limit),
+                POSITIVE(l->count[2] - l->limit), POSITIVE(l->count[3] - l->limit),
+                POSITIVE(l->count[4] - l->limit), POSITIVE(l->count[5] - l->limit),
+                POSITIVE(l->count[6] - l->limit), POSITIVE(l->count[7] - l->limit),
+                POSITIVE(l->count[8] - l->limit), POSITIVE(l->count[9] - l->limit),
+                POSITIVE(l->count[10] - l->limit), POSITIVE(l->count[11] - l->limit));
+        }
+        memset(&l->count, 0, sizeof(l->count));
+        l->last_time = usec;
+    }
+
+    l->count[level]++;
+    if (l->count[level] == l->limit + 1) {
+        loga("[LOG LEVEL %d REACHING LIMIT %d]", level, l->limit);
+        return true;
+    } else if (l->count[level] > l->limit + 1) {
+        return true; /* suppress these logs */
+    } else {
+        return false;
+    }
+}
+
 void
 _log(int level, const char *file, int line, int panic, const char *fmt, ...)
 {
@@ -149,7 +192,7 @@ _log(int level, const char *file, int line, int panic, const char *fmt, ...)
     char buf[LOG_MAX_LEN];
     char timestr[64];
     va_list args;
-    struct timeval tv;
+    int64_t usec;
     time_t t;
     struct tm *local;
     ssize_t n;
@@ -162,13 +205,18 @@ _log(int level, const char *file, int line, int panic, const char *fmt, ...)
     len = 0;            /* length of output buffer */
     size = LOG_MAX_LEN; /* size of output buffer */
 
-    gettimeofday(&tv, NULL);
-    t = tv.tv_sec;
+    usec = nc_usec_now();
+    t = usec / 1000000;
     local = localtime(&t);
     strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", local);
 
+    if (level > 0 && level < LOG_N_LEVEL
+            && l->limit > 0 && _log_reach_limit(level, usec)) {
+        return;
+    }
+
     len += nc_scnprintf(buf + len, size - len, "%.*s.%06d%s %s:%d ",
-                        strlen(timestr), timestr, tv.tv_usec,
+                        strlen(timestr), timestr, usec % 1000000,
                         _log_level_str(level), file, line);
 
     va_start(args, fmt);

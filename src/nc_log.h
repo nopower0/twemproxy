@@ -18,13 +18,6 @@
 #ifndef _NC_LOG_H_
 #define _NC_LOG_H_
 
-struct logger {
-    char *name;  /* log file name */
-    int  level;  /* log level */
-    int  fd;     /* log file descriptor */
-    int  nerror; /* # log error */
-};
-
 #define LOG_EMERG   0   /* system in unusable */
 #define LOG_ALERT   1   /* action must be taken immediately */
 #define LOG_CRIT    2   /* critical conditions */
@@ -37,8 +30,19 @@ struct logger {
 #define LOG_VVERB   9   /* verbose messages on crack */
 #define LOG_VVVERB  10  /* verbose messages on ganga */
 #define LOG_PVERB   11  /* periodic verbose messages on crack */
+#define LOG_N_LEVEL 12  /* max level */
 
 #define LOG_MAX_LEN 256 /* max length of log message */
+
+struct logger {
+    char *name;  /* log file name */
+    int  level;  /* log level */
+    int  fd;     /* log file descriptor */
+    int  nerror; /* # log error */
+    int  limit;  /* # limit per 100ms per level */
+    int64_t last_time;       /* # last log time */
+    int  count[LOG_N_LEVEL]; /* # log per level */
+};
 
 /*
  * log_stderr   - log to stderr
@@ -106,14 +110,15 @@ struct logger {
     }                                                                       \
 } while (0)
 
-int log_init(int level, char *filename);
+int log_init(int level, char *filename, int log_limit);
 void log_deinit(void);
 void log_level_up(void);
 void log_level_down(void);
 void log_level_set(int level);
 void log_reopen(void);
 int log_loggable(int level);
-const char * _log_level_str(int level);
+const char *_log_level_str(int level);
+bool _log_reach_limit(int level, int64_t usec);
 void _log(int level, const char *file, int line, int panic, const char *fmt, ...);
 void _log_stderr(const char *fmt, ...);
 void _log_hexdump(const char *file, int line, char *data, int datalen, const char *fmt, ...);

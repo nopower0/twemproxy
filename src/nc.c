@@ -34,6 +34,7 @@
 #define NC_LOG_MIN          LOG_EMERG
 #define NC_LOG_MAX          LOG_PVERB
 #define NC_LOG_PATH         NULL
+#define NC_LOG_LIMIT        0
 
 #define NC_STATS_PORT       STATS_PORT
 #define NC_STATS_ADDR       STATS_ADDR
@@ -59,6 +60,7 @@ static struct option long_options[] = {
     { "describe-stats", no_argument,        NULL,   'D' },
     { "verbose",        required_argument,  NULL,   'v' },
     { "output",         required_argument,  NULL,   'o' },
+    { "output-limit",   required_argument,  NULL,   'l' },
     { "conf-file",      required_argument,  NULL,   'c' },
     { "stats-port",     required_argument,  NULL,   's' },
     { "stats-interval", required_argument,  NULL,   'i' },
@@ -68,7 +70,7 @@ static struct option long_options[] = {
     { NULL,             0,                  NULL,    0  }
 };
 
-static char short_options[] = "hVtdDv:o:c:s:i:a:p:m:";
+static char short_options[] = "hVtdDv:o:l:c:s:i:a:p:m:";
 
 static rstatus_t
 nc_daemonize(int dump_core)
@@ -205,6 +207,7 @@ nc_show_usage(void)
         "Usage: nutcracker [-?hVdDt] [-v verbosity level] [-o output file]" CRLF
         "                  [-c conf file] [-s stats port] [-a stats addr]" CRLF
         "                  [-i stats interval] [-p pid file] [-m mbuf size]" CRLF
+        "                  [-l output limit per 100ms per level]" CRLF
         "");
     log_stderr(
         "Options:" CRLF
@@ -216,6 +219,7 @@ nc_show_usage(void)
     log_stderr(
         "  -v, --verbosity=N      : set logging level (default: %d, min: %d, max: %d)" CRLF
         "  -o, --output=S         : set logging file (default: %s)" CRLF
+        "  -l, --output-limit=S   : set logging limit per 100ms per level (default: %s)" CRLF
         "  -c, --conf-file=S      : set configuration file (default: %s)" CRLF
         "  -s, --stats-port=N     : set stats monitoring port (default: %d)" CRLF
         "  -a, --stats-addr=S     : set stats monitoring ip (default: %s)" CRLF
@@ -224,7 +228,7 @@ nc_show_usage(void)
         "  -m, --mbuf-size=N      : set size of mbuf chunk in bytes (default: %d bytes)" CRLF
         "",
         NC_LOG_DEFAULT, NC_LOG_MIN, NC_LOG_MAX,
-        NC_LOG_PATH != NULL ? NC_LOG_PATH : "stderr",
+        NC_LOG_PATH != NULL ? NC_LOG_PATH : "stderr", NC_LOG_LIMIT,
         NC_CONF_PATH,
         NC_STATS_PORT, NC_STATS_ADDR, NC_STATS_INTERVAL,
         NC_PID_FILE != NULL ? NC_PID_FILE : "off",
@@ -281,6 +285,7 @@ nc_set_default_options(struct instance *nci)
 
     nci->log_level = NC_LOG_DEFAULT;
     nci->log_filename = NC_LOG_PATH;
+    nci->log_limit = NC_LOG_LIMIT;
 
     nci->conf_filename = NC_CONF_PATH;
 
@@ -350,6 +355,10 @@ nc_get_options(int argc, char **argv, struct instance *nci)
 
         case 'o':
             nci->log_filename = optarg;
+            break;
+
+        case 'l':
+            nci->log_limit = nc_atoi(optarg, strlen(optarg));
             break;
 
         case 'c':
@@ -469,7 +478,7 @@ nc_pre_run(struct instance *nci)
 {
     rstatus_t status;
 
-    status = log_init(nci->log_level, nci->log_filename);
+    status = log_init(nci->log_level, nci->log_filename, nci->log_limit);
     if (status != NC_OK) {
         return status;
     }
