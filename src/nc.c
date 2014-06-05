@@ -219,7 +219,7 @@ nc_show_usage(void)
     log_stderr(
         "  -v, --verbosity=N      : set logging level (default: %d, min: %d, max: %d)" CRLF
         "  -o, --output=S         : set logging file (default: %s)" CRLF
-        "  -l, --output-limit=S   : set logging limit per 100ms per level (default: %s)" CRLF
+        "  -l, --output-limit=S   : set logging limit per 100ms per level (default: %d)" CRLF
         "  -c, --conf-file=S      : set configuration file (default: %s)" CRLF
         "  -s, --stats-port=N     : set stats monitoring port (default: %d)" CRLF
         "  -a, --stats-addr=S     : set stats monitoring ip (default: %s)" CRLF
