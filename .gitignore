@@ -24,6 +24,7 @@
 
 # Temporary
 *.swp
+*.swo
 *.~
 *.project
 *.cproject

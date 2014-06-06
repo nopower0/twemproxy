@@ -363,11 +363,19 @@ stats_create_buf(struct stats *st)
     size += key_value_extra;
 
     size += st->rusage_user_str.len;
-    size += int64_max_digits + 1 + 6; /* tv_sec.tv_usec */
+    size += int64_max_digits + 1 + 6; /* plus '.' + len of tv_sec.tv_usec */
     size += key_value_extra;
 
     size += st->rusage_system_str.len;
-    size += int64_max_digits + 1 + 6; /* tv_sec.tv_usec */
+    size += int64_max_digits + 1 + 6; /* plus '.' + len of tv_sec.tv_usec */
+    size += key_value_extra;
+
+    size += st->total_connections_str.len;
+    size += int64_max_digits;
+    size += key_value_extra;
+
+    size += st->curr_connections_str.len;
+    size += int64_max_digits;
     size += key_value_extra;
 
     /* server pools */
@@ -551,6 +559,16 @@ stats_add_header(struct stats *st)
 
     status = stats_add_float(st, &st->rusage_system_str,
        usage.ru_stime.tv_sec + (float)usage.ru_stime.tv_usec/1000000);
+    if (status != NC_OK) {
+        return status;
+    }
+
+    status = stats_add_num(st, &st->total_connections_str, conn_get_total_connections());
+    if (status != NC_OK) {
+        return status;
+    }
+
+    status = stats_add_num(st, &st->curr_connections_str, conn_get_curr_connections());
     if (status != NC_OK) {
         return status;
     }
@@ -957,6 +975,8 @@ stats_create(uint16_t stats_port, char *stats_ip, int stats_interval,
     string_set_text(&st->timestamp_str, "timestamp");
     string_set_text(&st->rusage_user_str, "rusage_user");
     string_set_text(&st->rusage_system_str, "rusage_system");
+    string_set_text(&st->total_connections_str, "total_connections");
+    string_set_text(&st->curr_connections_str, "curr_connections");
 
     st->updated = 0;
     st->aggregate = 0;

@@ -96,5 +96,7 @@ ssize_t conn_recv(struct conn *conn, void *buf, size_t size);
 ssize_t conn_sendv(struct conn *conn, struct array *sendv, size_t nsend);
 void conn_init(void);
 void conn_deinit(void);
+int64_t conn_get_total_connections(void);
+int64_t conn_get_curr_connections(void);
 
 #endif
