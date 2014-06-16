@@ -318,6 +318,8 @@ proxy_accept(struct context *ctx, struct conn *p)
     }
 
     if (conn_curr_client_connections() >= (int)ctx->max_client_connections) {
+        stats_pool_incr(ctx, p->owner, rejected_connections);
+
         log_debug(LOG_CRIT, "client connections %d exceed limit %d",
                   conn_curr_client_connections(),
                   ctx->max_client_connections);

@@ -24,6 +24,7 @@
     /* client behavior */                                                                                           \
     ACTION( client_eof,             STATS_COUNTER,      "# eof on client connections")                              \
     ACTION( client_err,             STATS_COUNTER,      "# errors on client connections")                           \
+    ACTION( rejected_connections,   STATS_COUNTER,      "# rejected client connections")                            \
     ACTION( client_connections,     STATS_GAUGE,        "# active client connections")                              \
     /* pool behavior */                                                                                             \
     ACTION( server_ejects,          STATS_COUNTER,      "# times backend server was ejected")                       \
