@@ -487,7 +487,7 @@ stats_add_num(struct stats *st, struct string *key, int64_t val)
 }
 
 static rstatus_t
-stats_add_float(struct stats *st, struct string *key, float val)
+stats_add_timeval(struct stats *st, struct string *key, struct timeval val)
 {
     struct stats_buffer *buf;
     uint8_t *pos;
@@ -498,7 +498,8 @@ stats_add_float(struct stats *st, struct string *key, float val)
     pos = buf->data + buf->len;
     room = buf->size - buf->len - 1;
 
-    n = nc_snprintf(pos, room, "\"%.*s\":%.6f, ", key->len, key->data, val);
+    n = nc_snprintf(pos, room, "\"%.*s\":%ld.%06ld, ", key->len, key->data,
+                    (long)val.tv_sec, (long)val.tv_usec);
     if (n < 0 || n >= (int)room) {
         return NC_ERROR;
     }
@@ -550,14 +551,12 @@ stats_add_header(struct stats *st)
     struct rusage usage;
     getrusage(RUSAGE_SELF, &usage);
 
-    status = stats_add_float(st, &st->rusage_user_str,
-       usage.ru_utime.tv_sec + (float)usage.ru_utime.tv_usec/1000000);
+    status = stats_add_timeval(st, &st->rusage_user_str, usage.ru_utime);
     if (status != NC_OK) {
         return status;
     }
 
-    status = stats_add_float(st, &st->rusage_system_str,
-       usage.ru_stime.tv_sec + (float)usage.ru_stime.tv_usec/1000000);
+    status = stats_add_timeval(st, &st->rusage_system_str, usage.ru_stime);
     if (status != NC_OK) {
         return status;
     }
