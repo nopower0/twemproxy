@@ -84,7 +84,7 @@
 static uint32_t nfree_connq;       /* # free conn q */
 static struct conn_tqh free_connq; /* free conn q */
 static int64_t total_connections;  /* connections counter from start */
-static int64_t curr_connections;   /* current # connections */
+static int curr_connections;       /* current # connections */
 
 /*
  * Return the context associated with this connection.
@@ -415,14 +415,14 @@ conn_sendv(struct conn *conn, struct array *sendv, size_t nsend)
     return NC_ERROR;
 }
 
-int64_t
-conn_get_curr_connections(void)
+int
+conn_curr_connections(void)
 {
     return curr_connections;
 }
 
 int64_t
-conn_get_total_connections(void)
+conn_total_connections(void)
 {
     return total_connections;
 }

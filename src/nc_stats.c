@@ -498,8 +498,7 @@ stats_add_float(struct stats *st, struct string *key, float val)
     pos = buf->data + buf->len;
     room = buf->size - buf->len - 1;
 
-    n = nc_snprintf(pos, room, "\"%.*s\":%.6f, ", key->len, key->data,
-                    val);
+    n = nc_snprintf(pos, room, "\"%.*s\":%.6f, ", key->len, key->data, val);
     if (n < 0 || n >= (int)room) {
         return NC_ERROR;
     }
@@ -563,12 +562,14 @@ stats_add_header(struct stats *st)
         return status;
     }
 
-    status = stats_add_num(st, &st->total_connections_str, conn_get_total_connections());
+    status = stats_add_num(st, &st->total_connections_str,
+                           conn_total_connections());
     if (status != NC_OK) {
         return status;
     }
 
-    status = stats_add_num(st, &st->curr_connections_str, conn_get_curr_connections());
+    status = stats_add_num(st, &st->curr_connections_str,
+                           conn_curr_connections());
     if (status != NC_OK) {
         return status;
     }
