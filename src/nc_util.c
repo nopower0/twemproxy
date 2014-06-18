@@ -223,7 +223,7 @@ _nc_alloc(size_t size, const char *name, int line)
 
     p = malloc(size);
     if (p == NULL) {
-        log_error("malloc(%zu) failed @ %s:%d", size, name, line);
+        log_debug(LOG_CRIT, "malloc(%zu) failed @ %s:%d", size, name, line);
     } else {
         log_debug(LOG_VVERB, "malloc(%zu) at %p @ %s:%d", size, p, name, line);
     }
@@ -259,7 +259,7 @@ _nc_realloc(void *ptr, size_t size, const char *name, int line)
 
     p = realloc(ptr, size);
     if (p == NULL) {
-        log_error("realloc(%zu) failed @ %s:%d", size, name, line);
+        log_debug(LOG_CRIT, "realloc(%zu) failed @ %s:%d", size, name, line);
     } else {
         log_debug(LOG_VVERB, "realloc(%zu) at %p @ %s:%d", size, p, name, line);
     }
@@ -424,7 +424,8 @@ nc_usec_now(void)
 
     status = gettimeofday(&now, NULL);
     if (status < 0) {
-        log_error("gettimeofday failed: %d @ %s", status, strerror(errno));
+        log_debug(LOG_CRIT, "gettimeofday failed: %d @ %s", status,
+                  strerror(errno));
         return -1;
     }
 
@@ -563,7 +564,6 @@ nc_unresolve_addr(struct sockaddr *addr, socklen_t addrlen)
                          service, sizeof(service),
                          NI_NUMERICHOST | NI_NUMERICSERV);
     if (status < 0) {
-        log_error("getnameinfo failed: %d @ %s", status, strerror(errno));
         return "unknown";
     }
 
@@ -592,7 +592,6 @@ nc_unresolve_peer_desc(int sd)
 
     status = getpeername(sd, addr, &addrlen);
     if (status < 0) {
-        log_error("getpeername failed: %d @ %s", status, strerror(errno));
         return "unknown";
     }
 
@@ -619,7 +618,6 @@ nc_unresolve_desc(int sd)
 
     status = getsockname(sd, addr, &addrlen);
     if (status < 0) {
-        log_error("getsockname failed: %d @ %s", status, strerror(errno));
         return "unknown";
     }
 

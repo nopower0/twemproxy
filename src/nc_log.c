@@ -124,21 +124,21 @@ const char *
 _log_level_str(int level)
 {
     static const char * _level_str[] = {
-        " 0 EMERG",
-        " 1 ALERT",
-        " 2 CRIT",
-        " 3 ERROR",
-        " 4 WARN",
-        " 5 NOTICE",
-        " 6 INFO",
-        " 7 DEBUG",
-        " 8 VERB",
-        " 9 VVERB",
-        " 10 VVVERB",
-        " 11 PVERB"
+        "0 EMERG",
+        "1 ALERT",
+        "2 CRIT",
+        "3 ERROR",
+        "4 WARN",
+        "5 NOTICE",
+        "6 INFO",
+        "7 DEBUG",
+        "8 VERB",
+        "9 VVERB",
+        "10 VVVERB",
+        "11 PVERB"
     };
     if (level < 0 || level > LOG_PVERB) {
-        return "";
+        return "0 SPECIAL";
     } else {
         return _level_str[level];
     }
@@ -161,21 +161,23 @@ _log_reach_limit(int level, int64_t now)
             suppressed += POSITIVE(l->count[i] - l->limit);
         }
         if (suppressed > 0) {
-            loga("[LOG SUPPRESSED:%d, 0:%d, 1:%d, 2:%d, 3:%d, 4:%d, 5:%d, "
-                "6:%d, 7:%d, 8:%d, 9:%d, 10:%d, 11:%d]",
-                suppressed,
-                POSITIVE(l->count[0] - l->limit),
-                POSITIVE(l->count[1] - l->limit),
-                POSITIVE(l->count[2] - l->limit),
-                POSITIVE(l->count[3] - l->limit),
-                POSITIVE(l->count[4] - l->limit),
-                POSITIVE(l->count[5] - l->limit),
-                POSITIVE(l->count[6] - l->limit),
-                POSITIVE(l->count[7] - l->limit),
-                POSITIVE(l->count[8] - l->limit),
-                POSITIVE(l->count[9] - l->limit),
-                POSITIVE(l->count[10] - l->limit),
-                POSITIVE(l->count[11] - l->limit));
+            /* loga use -1 as level, so it will not be recursively */
+            loga("LOG SUPPRESSED:%d, EMERG:%d, ALERT:%d, CRIT:%d, ERROR:%d, "
+                 "WARN:%d, NOTICE:%d, INFO:%d, DEBUG:%d, VERB:%d, VVERB:%d, "
+                 "VVVERB:%d, PVERB:%d",
+                 suppressed,
+                 POSITIVE(l->count[0] - l->limit),
+                 POSITIVE(l->count[1] - l->limit),
+                 POSITIVE(l->count[2] - l->limit),
+                 POSITIVE(l->count[3] - l->limit),
+                 POSITIVE(l->count[4] - l->limit),
+                 POSITIVE(l->count[5] - l->limit),
+                 POSITIVE(l->count[6] - l->limit),
+                 POSITIVE(l->count[7] - l->limit),
+                 POSITIVE(l->count[8] - l->limit),
+                 POSITIVE(l->count[9] - l->limit),
+                 POSITIVE(l->count[10] - l->limit),
+                 POSITIVE(l->count[11] - l->limit));
         }
         memset(&l->count, 0, sizeof(l->count));
         l->last_time = now;
@@ -183,7 +185,7 @@ _log_reach_limit(int level, int64_t now)
 
     l->count[level]++;
     if (l->count[level] == l->limit + 1) {
-        loga("[LOG LEVEL %d REACHING LIMIT %d]", level, l->limit);
+        loga("LOG LEVEL %d REACHING LIMIT %d", level, l->limit);
         return true;
     } else if (l->count[level] > l->limit + 1) {
         return true; /* suppress these logs */
@@ -223,7 +225,7 @@ _log(int level, const char *file, int line, int panic, const char *fmt, ...)
         return;
     }
 
-    len += nc_scnprintf(buf + len, size - len, "%.*s.%06d%s %s:%d ",
+    len += nc_scnprintf(buf + len, size - len, "%.*s.%06d %s %s:%d ",
                         strlen(timestr), timestr, now % 1000000,
                         _log_level_str(level), file, line);
 
