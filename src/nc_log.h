@@ -21,7 +21,7 @@
 #define LOG_EMERG   0   /* system in unusable */
 #define LOG_ALERT   1   /* action must be taken immediately */
 #define LOG_CRIT    2   /* critical conditions */
-#define LOG_ERR     3   /* error conditions */
+#define LOG_ERROR   3   /* error conditions */
 #define LOG_WARN    4   /* warning conditions */
 #define LOG_NOTICE  5   /* normal but significant condition (default) */
 #define LOG_INFO    6   /* informational */
@@ -48,65 +48,98 @@ struct logger {
  * log_stderr   - log to stderr
  * loga         - log always
  * loga_hexdump - log hexdump always
+ * log_panic    - log messages followed by a panic
+ * log_emerg    - emerg log messages
+ * log_crit     - crit log messages
  * log_error    - error log messages
  * log_warn     - warning log messages
- * log_panic    - log messages followed by a panic
+ * log_notice   - notice log messages
+ * log_info     - info log messages
  * ...
  * log_debug    - debug log messages based on a log level
- * log_hexdump  - hexadump -C of a log buffer
+ * log_hexdump  - hexadump -C of a log buffer on a log level
  */
-#ifdef NC_DEBUG_LOG
-
-#define log_debug(_level, ...) do {                                         \
-    if (log_loggable(_level) != 0) {                                        \
-        _log(_level, __FILE__, __LINE__, 0, __VA_ARGS__);                           \
-    }                                                                       \
-} while (0)
-
-#define log_hexdump(_level, _data, _datalen, ...) do {                      \
-    if (log_loggable(_level) != 0) {                                        \
-        _log(_level, __FILE__, __LINE__, 0, __VA_ARGS__);                           \
-        _log_hexdump(__FILE__, __LINE__, (char *)(_data), (int)(_datalen),  \
-                     __VA_ARGS__);                                          \
-    }                                                                       \
-} while (0)
-
-#else
-
-#define log_debug(_level, ...)
-#define log_hexdump(_level, _data, _datalen, ...)
-
-#endif
 
 #define log_stderr(...) do {                                                \
     _log_stderr(__VA_ARGS__);                                               \
 } while (0)
 
 #define loga(...) do {                                                      \
-    _log(-1, __FILE__, __LINE__, 0, __VA_ARGS__);                               \
+    _log(-1, __FILE__, __LINE__, 0, __VA_ARGS__);                           \
 } while (0)
 
 #define loga_hexdump(_data, _datalen, ...) do {                             \
-    _log(-1, __FILE__, __LINE__, 0, __VA_ARGS__);                               \
+    _log(-1, __FILE__, __LINE__, 0, __VA_ARGS__);                           \
     _log_hexdump(__FILE__, __LINE__, (char *)(_data), (int)(_datalen),      \
                  __VA_ARGS__);                                              \
 } while (0)                                                                 \
 
-#define log_error(...) do {                                                 \
+#define log_panic(...) do {                                                 \
+    if (log_loggable(LOG_EMERG) != 0) {                                     \
+        _log(LOG_EMERG, __FILE__, __LINE__, 1, __VA_ARGS__);                \
+    }                                                                       \
+} while (0)
+
+#define log_emerg(...) do {                                                 \
+    if (log_loggable(LOG_EMERG) != 0) {                                     \
+        _log(LOG_EMERG, __FILE__, __LINE__, 0, __VA_ARGS__);                \
+    }                                                                       \
+} while (0)
+
+#define log_alert(...) do {                                                 \
     if (log_loggable(LOG_ALERT) != 0) {                                     \
-        _log(LOG_ERR, __FILE__, __LINE__, 0, __VA_ARGS__);                           \
+        _log(LOG_ALERT, __FILE__, __LINE__, 0, __VA_ARGS__);                \
+    }                                                                       \
+} while (0)
+
+#define log_crit(...) do {                                                  \
+    if (log_loggable(LOG_CRIT) != 0) {                                      \
+        _log(LOG_CRIT, __FILE__, __LINE__, 0, __VA_ARGS__);                 \
+    }                                                                       \
+} while (0)
+
+#define log_error(...) do {                                                 \
+    if (log_loggable(LOG_ERROR) != 0) {                                     \
+        _log(LOG_ERROR, __FILE__, __LINE__, 0, __VA_ARGS__);                \
     }                                                                       \
 } while (0)
 
 #define log_warn(...) do {                                                  \
     if (log_loggable(LOG_WARN) != 0) {                                      \
-        _log(LOG_WARN, __FILE__, __LINE__, 0, __VA_ARGS__);                           \
+        _log(LOG_WARN, __FILE__, __LINE__, 0, __VA_ARGS__);                 \
     }                                                                       \
 } while (0)
 
-#define log_panic(...) do {                                                 \
-    if (log_loggable(LOG_EMERG) != 0) {                                     \
-        _log(LOG_EMERG, __FILE__, __LINE__, 1, __VA_ARGS__);                           \
+#define log_notice(...) do {                                                \
+    if (log_loggable(LOG_NOTICE) != 0) {                                    \
+        _log(LOG_NOTICE, __FILE__, __LINE__, 0, __VA_ARGS__);               \
+    }                                                                       \
+} while (0)
+
+#define log_info(...) do {                                                  \
+    if (log_loggable(LOG_INFO) != 0) {                                      \
+        _log(LOG_INFO, __FILE__, __LINE__, 0, __VA_ARGS__);                 \
+    }                                                                       \
+} while (0)
+
+#ifdef NC_DEBUG_LOG
+
+#define log_debug(_level, ...) do {                                         \
+    if (log_loggable(_level) != 0) {                                        \
+        _log(_level, __FILE__, __LINE__, 0, __VA_ARGS__);                   \
+    }                                                                       \
+} while (0)
+
+#else
+
+#define log_debug(_level, ...)
+
+#endif
+
+#define log_hexdump(_level, _data, _datalen, ...) do {                      \
+    if (log_loggable(_level) != 0) {                                        \
+        _log_hexdump(__FILE__, __LINE__, (char *)(_data),                   \
+                     (int)(_datalen), __VA_ARGS__);                         \
     }                                                                       \
 } while (0)
 

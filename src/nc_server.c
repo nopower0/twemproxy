@@ -357,8 +357,8 @@ server_close(struct context *ctx, struct conn *conn)
          * 2. client has already closed its connection
          */
         if (msg->swallow || msg->noreply) {
-            log_debug(LOG_INFO, "close s %d swallow req %"PRIu64" len %"PRIu32
-                      " type %d", conn->sd, msg->id, msg->mlen, msg->type);
+            log_info("close s %d swallow req %"PRIu64" len %"PRIu32
+                     " type %d", conn->sd, msg->id, msg->mlen, msg->type);
             req_put(msg);
         } else {
             c_conn = msg->owner;
@@ -372,10 +372,10 @@ server_close(struct context *ctx, struct conn *conn)
                 event_add_out(ctx->evb, msg->owner);
             }
 
-            log_debug(LOG_INFO, "close s %d schedule error for req %"PRIu64" "
-                      "len %"PRIu32" type %d from c %d%c %s", conn->sd, msg->id,
-                      msg->mlen, msg->type, c_conn->sd, conn->err ? ':' : ' ',
-                      conn->err ? strerror(conn->err): " ");
+            log_info("close s %d schedule error for req %"PRIu64" "
+                     "len %"PRIu32" type %d from c %d%c %s", conn->sd, msg->id,
+                     msg->mlen, msg->type, c_conn->sd, conn->err ? ':' : ' ',
+                     conn->err ? strerror(conn->err): " ");
         }
     }
     ASSERT(TAILQ_EMPTY(&conn->imsg_q));
@@ -387,8 +387,8 @@ server_close(struct context *ctx, struct conn *conn)
         conn->dequeue_outq(ctx, conn, msg);
 
         if (msg->swallow) {
-            log_debug(LOG_INFO, "close s %d swallow req %"PRIu64" len %"PRIu32
-                      " type %d", conn->sd, msg->id, msg->mlen, msg->type);
+            log_info("close s %d swallow req %"PRIu64" len %"PRIu32
+                     " type %d", conn->sd, msg->id, msg->mlen, msg->type);
             req_put(msg);
         } else {
             c_conn = msg->owner;
@@ -402,10 +402,10 @@ server_close(struct context *ctx, struct conn *conn)
                 event_add_out(ctx->evb, msg->owner);
             }
 
-            log_debug(LOG_INFO, "close s %d schedule error for req %"PRIu64" "
-                      "len %"PRIu32" type %d from c %d%c %s", conn->sd, msg->id,
-                      msg->mlen, msg->type, c_conn->sd, conn->err ? ':' : ' ',
-                      conn->err ? strerror(conn->err): " ");
+            log_info("close s %d schedule error for req %"PRIu64" "
+                     "len %"PRIu32" type %d from c %d%c %s", conn->sd, msg->id,
+                     msg->mlen, msg->type, c_conn->sd, conn->err ? ':' : ' ',
+                     conn->err ? strerror(conn->err): " ");
         }
     }
     ASSERT(TAILQ_EMPTY(&conn->omsg_q));
@@ -419,8 +419,8 @@ server_close(struct context *ctx, struct conn *conn)
 
         rsp_put(msg);
 
-        log_debug(LOG_INFO, "close s %d discarding rsp %"PRIu64" len %"PRIu32" "
-                  "in error", conn->sd, msg->id, msg->mlen);
+        log_info("close s %d discarding rsp %"PRIu64" len %"PRIu32" "
+                 "in error", conn->sd, msg->id, msg->mlen);
     }
 
     ASSERT(conn->smsg == NULL);
@@ -505,8 +505,8 @@ server_connect(struct context *ctx, struct server *server, struct conn *conn)
 
     ASSERT(!conn->connecting);
     conn->connected = 1;
-    log_debug(LOG_INFO, "connected on s %d to server '%.*s'", conn->sd,
-              server->pname.len, server->pname.data);
+    log_info("connected on s %d to server '%.*s'", conn->sd,
+             server->pname.len, server->pname.data);
 
     return NC_OK;
 
@@ -528,8 +528,8 @@ server_connected(struct context *ctx, struct conn *conn)
     conn->connecting = 0;
     conn->connected = 1;
 
-    log_debug(LOG_INFO, "connected on s %d to server '%.*s'", conn->sd,
-              server->pname.len, server->pname.data);
+    log_info("connected on s %d to server '%.*s'", conn->sd,
+             server->pname.len, server->pname.data);
 }
 
 void
@@ -586,9 +586,9 @@ server_pool_update(struct server_pool *pool)
         return status;
     }
 
-    log_debug(LOG_INFO, "update pool %"PRIu32" '%.*s' to add %"PRIu32" servers",
-              pool->idx, pool->name.len, pool->name.data,
-              pool->nlive_server - pnlive_server);
+    log_info("update pool %"PRIu32" '%.*s' to add %"PRIu32" servers",
+             pool->idx, pool->name.len, pool->name.data,
+             pool->nlive_server - pnlive_server);
 
 
     return NC_OK;

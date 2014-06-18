@@ -29,16 +29,16 @@ core_calc_connections(struct context *ctx)
 {
     struct rlimit limit;
     if (getrlimit(RLIMIT_NOFILE,&limit) == -1) {
-        log_debug(LOG_CRIT, "getrlimit failed: %s", strerror(errno));
+        log_crit("getrlimit failed: %s", strerror(errno));
         return NC_ERROR;
     }
 
     ctx->rlimit_nofile = (uint32_t)limit.rlim_cur;
     ctx->max_client_connections = 
         ctx->rlimit_nofile - ctx->max_server_connections - RESERVED_FDS;
-    log_debug(LOG_NOTICE, "current rlimit nofile %d, max_server_connections %d, "
-              "max_client_connections %d", ctx->rlimit_nofile,
-              ctx->max_server_connections, ctx->max_client_connections);
+    log_notice("current rlimit nofile %d, max_server_connections %d, "
+               "max_client_connections %d", ctx->rlimit_nofile,
+               ctx->max_server_connections, ctx->max_client_connections);
 
     return NC_OK;
 }
@@ -189,9 +189,9 @@ core_recv(struct context *ctx, struct conn *conn)
 
     status = conn->recv(ctx, conn);
     if (status != NC_OK) {
-        log_debug(LOG_INFO, "recv on %c %d failed: %s",
-                  conn->client ? 'c' : (conn->proxy ? 'p' : 's'), conn->sd,
-                  strerror(errno));
+        log_info("recv on %c %d failed: %s",
+                 conn->client ? 'c' : (conn->proxy ? 'p' : 's'), conn->sd,
+                 strerror(errno));
     }
 
     return status;
@@ -204,9 +204,9 @@ core_send(struct context *ctx, struct conn *conn)
 
     status = conn->send(ctx, conn);
     if (status != NC_OK) {
-        log_debug(LOG_INFO, "send on %c %d failed: %s",
-                  conn->client ? 'c' : (conn->proxy ? 'p' : 's'), conn->sd,
-                  strerror(errno));
+        log_info("send on %c %d failed: %s",
+                 conn->client ? 'c' : (conn->proxy ? 'p' : 's'), conn->sd,
+                 strerror(errno));
     }
 
     return status;
@@ -294,7 +294,7 @@ core_timeout(struct context *ctx)
             return;
         }
 
-        log_debug(LOG_INFO, "req %"PRIu64" on s %d timedout", msg->id, conn->sd);
+        log_info("req %"PRIu64" on s %d timedout", msg->id, conn->sd);
 
         msg_tmo_delete(msg);
         conn->err = ETIMEDOUT;

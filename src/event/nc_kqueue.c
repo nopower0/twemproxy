@@ -75,7 +75,7 @@ event_base_create(int nevent, event_cb_t cb)
     evb->nprocessed = 0;
     evb->cb = cb;
 
-    log_debug(LOG_INFO, "kq %d with nevent %d", evb->kq, evb->nevent);
+    log_info("kq %d with nevent %d", evb->kq, evb->nevent);
 
     return evb;
 }

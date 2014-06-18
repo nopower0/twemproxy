@@ -155,7 +155,7 @@ rsp_filter(struct context *ctx, struct conn *conn, struct msg *msg)
 
     pmsg = TAILQ_FIRST(&conn->omsg_q);
     if (pmsg == NULL) {
-        log_hexdump(LOG_ERR, STAILQ_FIRST(&msg->mhdr)->pos,
+        log_hexdump(LOG_ERROR, STAILQ_FIRST(&msg->mhdr)->pos,
                     mbuf_length(STAILQ_FIRST(&msg->mhdr)),
                     "filter stray rsp %"PRIu64" len %"PRIu32" on s %d",
                     msg->id, msg->mlen, conn->sd);
@@ -190,9 +190,9 @@ rsp_filter(struct context *ctx, struct conn *conn, struct msg *msg)
         conn->dequeue_outq(ctx, conn, pmsg);
         pmsg->done = 1;
 
-        log_debug(LOG_INFO, "swallow rsp %"PRIu64" len %"PRIu32" of req "
-                  "%"PRIu64" on s %d", msg->id, msg->mlen, pmsg->id,
-                  conn->sd);
+        log_info("swallow rsp %"PRIu64" len %"PRIu32" of req "
+                 "%"PRIu64" on s %d", msg->id, msg->mlen, pmsg->id,
+                 conn->sd);
 
         rsp_put(msg);
         req_put(pmsg);
@@ -283,7 +283,7 @@ rsp_send_next(struct context *ctx, struct conn *conn)
         /* nothing is outstanding, initiate close? */
         if (pmsg == NULL && conn->eof) {
             conn->done = 1;
-            log_debug(LOG_INFO, "c %d is done", conn->sd);
+            log_info("c %d is done", conn->sd);
         }
 
         status = event_del_out(ctx->evb, conn);

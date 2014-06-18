@@ -2067,7 +2067,7 @@ redis_pre_coalesce(struct msg *r)
          * with EINVAL errno
          */
         mbuf = STAILQ_FIRST(&r->mhdr);
-        log_hexdump(LOG_ERR, mbuf->pos, mbuf_length(mbuf), "rsp fragment "
+        log_hexdump(LOG_ERROR, mbuf->pos, mbuf_length(mbuf), "rsp fragment "
                     "with unknown type %d", r->type);
         pr->error = 1;
         pr->err = EINVAL;

@@ -337,7 +337,7 @@ req_recv_next(struct context *ctx, struct conn *conn, bool alloc)
          */
         if (!conn->active(conn)) {
             conn->done = 1;
-            log_debug(LOG_INFO, "c %d is done", conn->sd);
+            log_info("c %d is done", conn->sd);
         }
         return NULL;
     }
@@ -379,8 +379,7 @@ req_filter(struct context *ctx, struct conn *conn, struct msg *msg)
      */
     if (msg->quit) {
         ASSERT(conn->rmsg == NULL);
-        log_debug(LOG_INFO, "filter quit req %"PRIu64" from c %d", msg->id,
-                  conn->sd);
+        log_info("filter quit req %"PRIu64" from c %d", msg->id, conn->sd);
         conn->eof = 1;
         conn->recv_ready = 0;
         req_put(msg);
@@ -397,9 +396,9 @@ req_forward_error(struct context *ctx, struct conn *conn, struct msg *msg)
 
     ASSERT(conn->client && !conn->proxy);
 
-    log_debug(LOG_INFO, "forward req %"PRIu64" len %"PRIu32" type %d from "
-              "c %d failed: %s", msg->id, msg->mlen, msg->type, conn->sd,
-              strerror(errno));
+    log_info("forward req %"PRIu64" len %"PRIu32" type %d from "
+             "c %d failed: %s", msg->id, msg->mlen, msg->type, conn->sd,
+             strerror(errno));
 
     msg->done = 1;
     msg->error = 1;

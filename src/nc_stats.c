@@ -894,8 +894,8 @@ stats_listen(struct stats *st)
         return NC_ERROR;
     }
 
-    log_debug(LOG_NOTICE, "m %d listening on '%.*s:%u'", st->sd,
-              st->addr.len, st->addr.data, st->port);
+    log_notice("m %d listening on '%.*s:%u'", st->sd,
+               st->addr.len, st->addr.data, st->port);
 
     return NC_OK;
 }

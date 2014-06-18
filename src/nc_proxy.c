@@ -199,11 +199,11 @@ proxy_each_init(void *elem, void *data)
         return status;
     }
 
-    log_debug(LOG_NOTICE, "p %d listening on '%.*s' in %s pool %"PRIu32" '%.*s'"
-              " with %"PRIu32" servers", p->sd, pool->addrstr.len,
-              pool->addrstr.data, pool->redis ? "redis" : "memcache",
-              pool->idx, pool->name.len, pool->name.data,
-              array_n(&pool->server));
+    log_notice("p %d listening on '%.*s' in %s pool %"PRIu32" '%.*s'"
+               " with %"PRIu32" servers", p->sd, pool->addrstr.len,
+               pool->addrstr.data, pool->redis ? "redis" : "memcache",
+               pool->idx, pool->name.len, pool->name.data,
+               array_n(&pool->server));
 
     return NC_OK;
 }
@@ -293,15 +293,15 @@ proxy_accept(struct context *ctx, struct conn *p)
              * continue to run instead of close the server socket
              */
             if (errno == EMFILE || errno == ENFILE) {
-                log_debug(LOG_CRIT, "accept on p %d failed: %s", p->sd,
-                          strerror(errno));
+                log_crit("accept on p %d failed: %s", p->sd,
+                         strerror(errno));
                 p->recv_ready = 0;
 
-                log_debug(LOG_CRIT, "connections status: rlimit nofile %d, "
-                          "used connections: %d, max client connections %d, "
-                          "curr client connections %d", ctx->rlimit_nofile,
-                          conn_curr_connections(), ctx->max_client_connections,
-                          conn_curr_client_connections());
+                log_crit("connections status: rlimit nofile %d, "
+                         "used connections: %d, max client connections %d, "
+                         "curr client connections %d", ctx->rlimit_nofile,
+                         conn_curr_connections(), ctx->max_client_connections,
+                         conn_curr_client_connections());
                 /* Since we maintain a safe max_client_connections and check
                  * it after every accept, we should not reach here.
                  * So we will panic after this log */
@@ -320,9 +320,9 @@ proxy_accept(struct context *ctx, struct conn *p)
     if (conn_curr_client_connections() >= (int)ctx->max_client_connections) {
         stats_pool_incr(ctx, p->owner, rejected_connections);
 
-        log_debug(LOG_CRIT, "client connections %d exceed limit %d",
-                  conn_curr_client_connections(),
-                  ctx->max_client_connections);
+        log_crit("client connections %d exceed limit %d",
+                 conn_curr_client_connections(),
+                 ctx->max_client_connections);
         status = close(sd);
         if (status < 0) {
             log_error("close c %d failed, ignored: %s", sd, strerror(errno));
@@ -368,8 +368,8 @@ proxy_accept(struct context *ctx, struct conn *p)
         return status;
     }
 
-    log_debug(LOG_NOTICE, "accepted c %d on p %d from '%s'", c->sd, p->sd,
-              nc_unresolve_peer_desc(c->sd));
+    log_notice("accepted c %d on p %d from '%s'", c->sd, p->sd,
+               nc_unresolve_peer_desc(c->sd));
 
     return NC_OK;
 }
