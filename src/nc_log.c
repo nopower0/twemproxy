@@ -146,31 +146,39 @@ _log_level_str(int level)
 
 #define POSITIVE(n) ((n) > 0 ? (n) : 0)
 bool
-_log_reach_limit(int level, int64_t usec)
+_log_reach_limit(int level, int64_t now)
 {
     struct logger *l = &logger;
     int suppressed;
     int i;
 
-    /* control limit ever 100ms */
-    if (usec / 100000 > l->last_time / 100000) {
+    /* the limit is controled by every 100ms, so we check the count and 
+     * clear it every 100ms */
+    if (now / 100000 > l->last_time / 100000) {
         suppressed = 0;
         i = 0;
         for (i = 0; i < LOG_N_LEVEL; ++i) {
             suppressed += POSITIVE(l->count[i] - l->limit);
         }
         if (suppressed > 0) {
-            loga("[LOG SUPPRESSED: 0:%d, 1:%d, 2:%d, 3:%d, 4:%d, 5:%d, "
+            loga("[LOG SUPPRESSED:%d, 0:%d, 1:%d, 2:%d, 3:%d, 4:%d, 5:%d, "
                 "6:%d, 7:%d, 8:%d, 9:%d, 10:%d, 11:%d]",
-                POSITIVE(l->count[0] - l->limit), POSITIVE(l->count[1] - l->limit),
-                POSITIVE(l->count[2] - l->limit), POSITIVE(l->count[3] - l->limit),
-                POSITIVE(l->count[4] - l->limit), POSITIVE(l->count[5] - l->limit),
-                POSITIVE(l->count[6] - l->limit), POSITIVE(l->count[7] - l->limit),
-                POSITIVE(l->count[8] - l->limit), POSITIVE(l->count[9] - l->limit),
-                POSITIVE(l->count[10] - l->limit), POSITIVE(l->count[11] - l->limit));
+                suppressed,
+                POSITIVE(l->count[0] - l->limit),
+                POSITIVE(l->count[1] - l->limit),
+                POSITIVE(l->count[2] - l->limit),
+                POSITIVE(l->count[3] - l->limit),
+                POSITIVE(l->count[4] - l->limit),
+                POSITIVE(l->count[5] - l->limit),
+                POSITIVE(l->count[6] - l->limit),
+                POSITIVE(l->count[7] - l->limit),
+                POSITIVE(l->count[8] - l->limit),
+                POSITIVE(l->count[9] - l->limit),
+                POSITIVE(l->count[10] - l->limit),
+                POSITIVE(l->count[11] - l->limit));
         }
         memset(&l->count, 0, sizeof(l->count));
-        l->last_time = usec;
+        l->last_time = now;
     }
 
     l->count[level]++;
@@ -192,7 +200,7 @@ _log(int level, const char *file, int line, int panic, const char *fmt, ...)
     char buf[LOG_MAX_LEN];
     char timestr[64];
     va_list args;
-    int64_t usec;
+    int64_t now;
     time_t t;
     struct tm *local;
     ssize_t n;
@@ -205,18 +213,18 @@ _log(int level, const char *file, int line, int panic, const char *fmt, ...)
     len = 0;            /* length of output buffer */
     size = LOG_MAX_LEN; /* size of output buffer */
 
-    usec = nc_usec_now();
-    t = usec / 1000000;
+    now = nc_usec_now();
+    t = now / 1000000;
     local = localtime(&t);
     strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", local);
 
     if (level > 0 && level < LOG_N_LEVEL
-            && l->limit > 0 && _log_reach_limit(level, usec)) {
+            && l->limit > 0 && _log_reach_limit(level, now)) {
         return;
     }
 
     len += nc_scnprintf(buf + len, size - len, "%.*s.%06d%s %s:%d ",
-                        strlen(timestr), timestr, usec % 1000000,
+                        strlen(timestr), timestr, now % 1000000,
                         _log_level_str(level), file, line);
 
     va_start(args, fmt);
