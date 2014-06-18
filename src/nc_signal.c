@@ -99,11 +99,13 @@ signal_handler(int signo)
         action = log_level_down;
         break;
 
-    case SIGHUP:
-        actionstr = ", reopening log file";
-        action = log_reopen;
-        break;
+    // using svc -h to close program is our convention, so we take it as SIGINT
+    //case SIGHUP:
+        //actionstr = ", reopening log file";
+        //action = log_reopen;
+        //break;
 
+    case SIGHUP:
     case SIGINT:
         done = true;
         actionstr = ", exiting";
