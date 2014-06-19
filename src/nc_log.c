@@ -279,13 +279,11 @@ _log_stderr(const char *fmt, ...)
  * See -C option in man hexdump
  */
 void
-_log_hexdump(const char *file, int line, char *data, int datalen,
-             const char *fmt, ...)
+_log_hexdump(int level, const char *file, int line, char *data, int datalen)
 {
     struct logger *l = &logger;
     char buf[8 * LOG_MAX_LEN];
     int i, off, len, size, errno_save;
-    ssize_t n;
 
     if (l->fd < 0) {
         return;
@@ -302,7 +300,7 @@ _log_hexdump(const char *file, int line, char *data, int datalen,
         unsigned char c;
         int savelen;
 
-        len += nc_scnprintf(buf + len, size - len, "%08x  ", off);
+        len += nc_scnprintf(buf + len, size - len, "DUMP %08x  ", off);
 
         save = data;
         savelen = datalen;
@@ -326,14 +324,12 @@ _log_hexdump(const char *file, int line, char *data, int datalen,
             c = (unsigned char)(isprint(*data) ? *data : '.');
             len += nc_scnprintf(buf + len, size - len, "%c", c);
         }
-        len += nc_scnprintf(buf + len, size - len, "|\n");
+        len += nc_scnprintf(buf + len, size - len, "|");
 
         off += 16;
-    }
 
-    n = nc_write(l->fd, buf, len);
-    if (n < 0) {
-        l->nerror++;
+        _log(level, file, line, 0, "%s", buf);
+        len = 0;
     }
 
     errno = errno_save;

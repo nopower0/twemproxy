@@ -70,8 +70,7 @@ struct logger {
 
 #define loga_hexdump(_data, _datalen, ...) do {                             \
     _log(-1, __FILE__, __LINE__, 0, __VA_ARGS__);                           \
-    _log_hexdump(__FILE__, __LINE__, (char *)(_data), (int)(_datalen),      \
-                 __VA_ARGS__);                                              \
+    _log_hexdump(-1, __FILE__, __LINE__, (char *)(_data), (int)(_datalen)); \
 } while (0)                                                                 \
 
 #define log_panic(...) do {                                                 \
@@ -138,8 +137,9 @@ struct logger {
 
 #define log_hexdump(_level, _data, _datalen, ...) do {                      \
     if (log_loggable(_level) != 0) {                                        \
-        _log_hexdump(__FILE__, __LINE__, (char *)(_data),                   \
-                     (int)(_datalen), __VA_ARGS__);                         \
+        _log(_level, __FILE__, __LINE__, 0, __VA_ARGS__);                   \
+        _log_hexdump(_level, __FILE__, __LINE__, (char *)(_data),           \
+                     (int)(_datalen));                         \
     }                                                                       \
 } while (0)
 
@@ -152,8 +152,10 @@ void log_reopen(void);
 int log_loggable(int level);
 const char *_log_level_str(int level);
 bool _log_reach_limit(int level, int64_t usec);
-void _log(int level, const char *file, int line, int panic, const char *fmt, ...);
+void _log(int level, const char *file, int line, int panic,
+          const char *fmt, ...);
 void _log_stderr(const char *fmt, ...);
-void _log_hexdump(const char *file, int line, char *data, int datalen, const char *fmt, ...);
+void _log_hexdump(int level, const char *file, int line,
+                  char *data, int datalen);
 
 #endif
