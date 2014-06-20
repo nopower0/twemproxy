@@ -37,6 +37,7 @@
 #define NC_LOG_MAX          LOG_PVERB
 #define NC_LOG_PATH         NULL
 #define NC_LOG_LIMIT        0
+#define NC_LOG_ACCESS_SAMPLING 0
 
 #define NC_STATS_PORT       STATS_PORT
 #define NC_STATS_ADDR       STATS_ADDR
@@ -63,6 +64,7 @@ static struct option long_options[] = {
     { "verbose",        required_argument,  NULL,   'v' },
     { "output",         required_argument,  NULL,   'o' },
     { "output-limit",   required_argument,  NULL,   'l' },
+    { "access-sampling",required_argument,  NULL,   'r' },
     { "conf-file",      required_argument,  NULL,   'c' },
     { "stats-port",     required_argument,  NULL,   's' },
     { "stats-interval", required_argument,  NULL,   'i' },
@@ -72,7 +74,7 @@ static struct option long_options[] = {
     { NULL,             0,                  NULL,    0  }
 };
 
-static char short_options[] = "hVtdDv:o:l:c:s:i:a:p:m:";
+static char short_options[] = "hVtdDv:o:l:r:c:s:i:a:p:m:";
 
 static rstatus_t
 nc_daemonize(int dump_core)
@@ -212,6 +214,7 @@ nc_show_usage(void)
         "                  [-c conf file] [-s stats port] [-a stats addr]" CRLF
         "                  [-i stats interval] [-p pid file] [-m mbuf size]" CRLF
         "                  [-l output limit per 100ms per level]" CRLF
+        "                  [-r output access sampling]" CRLF
         "");
     log_stderr(
         "Options:" CRLF
@@ -224,6 +227,8 @@ nc_show_usage(void)
         "  -v, --verbosity=N      : set logging level (default: %d, min: %d, max: %d)" CRLF
         "  -o, --output=S         : set logging file (default: %s)" CRLF
         "  -l, --output-limit=S   : set logging limit per 100ms per level (default: %d)" CRLF
+        "  -r, --access-sampling=S: set logging access sampling every n msg " CRLF
+        "                           0 to disable (default: %d)" CRLF
         "  -c, --conf-file=S      : set configuration file (default: %s)" CRLF
         "  -s, --stats-port=N     : set stats monitoring port (default: %d)" CRLF
         "  -a, --stats-addr=S     : set stats monitoring ip (default: %s)" CRLF
@@ -232,7 +237,8 @@ nc_show_usage(void)
         "  -m, --mbuf-size=N      : set size of mbuf chunk in bytes (default: %d bytes)" CRLF
         "",
         NC_LOG_DEFAULT, NC_LOG_MIN, NC_LOG_MAX,
-        NC_LOG_PATH != NULL ? NC_LOG_PATH : "stderr", NC_LOG_LIMIT,
+        NC_LOG_PATH != NULL ? NC_LOG_PATH : "stderr",
+        NC_LOG_LIMIT, NC_LOG_ACCESS_SAMPLING,
         NC_CONF_PATH,
         NC_STATS_PORT, NC_STATS_ADDR, NC_STATS_INTERVAL,
         NC_PID_FILE != NULL ? NC_PID_FILE : "off",
@@ -290,6 +296,7 @@ nc_set_default_options(struct instance *nci)
     nci->log_level = NC_LOG_DEFAULT;
     nci->log_filename = NC_LOG_PATH;
     nci->log_limit = NC_LOG_LIMIT;
+    nci->log_access_sampling = NC_LOG_ACCESS_SAMPLING;
 
     nci->conf_filename = NC_CONF_PATH;
 
@@ -363,6 +370,10 @@ nc_get_options(int argc, char **argv, struct instance *nci)
 
         case 'l':
             nci->log_limit = nc_atoi(optarg, strlen(optarg));
+            break;
+
+        case 'r':
+            nci->log_access_sampling = nc_atoi(optarg, strlen(optarg));
             break;
 
         case 'c':
@@ -482,7 +493,8 @@ nc_pre_run(struct instance *nci)
 {
     rstatus_t status;
 
-    status = log_init(nci->log_level, nci->log_filename, nci->log_limit);
+    status = log_init(nci->log_level, nci->log_filename, nci->log_limit,
+                      nci->log_access_sampling);
     if (status != NC_OK) {
         return status;
     }

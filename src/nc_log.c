@@ -28,13 +28,16 @@
 static struct logger logger;
 
 int
-log_init(int level, char *name, int log_limit)
+log_init(int level, char *name, int limit, int access_sampling)
 {
     struct logger *l = &logger;
 
     l->level = MAX(LOG_EMERG, MIN(level, LOG_PVERB));
     l->name = name;
-    l->limit = log_limit;
+    l->limit = limit;
+    l->access_sampling = access_sampling;
+    l->access_counter = 0;
+
     memset(l->count, 0, sizeof(l->count));
     if (name == NULL || !strlen(name)) {
         l->fd = STDERR_FILENO;
@@ -114,6 +117,19 @@ log_loggable(int level)
     struct logger *l = &logger;
 
     if (level > l->level) {
+        return 0;
+    }
+
+    return 1;
+}
+
+int
+log_access_loggable(int level)
+{
+    struct logger *l = &logger;
+
+    if (level > l->level || l->access_sampling <= 0
+            || (l->access_counter++ % (uint64_t)l->access_sampling != 0)) {
         return 0;
     }
 

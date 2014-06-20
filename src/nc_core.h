@@ -135,7 +135,8 @@ struct instance {
     struct context  *ctx;                        /* active context */
     int             log_level;                   /* log level */
     char            *log_filename;               /* log filename */
-    int             log_limit;                   /* log limit per 100ms per level */
+    int             log_limit;                   /* limit per 100ms per level */
+    int             log_access_sampling;         /* log every N requests */
     char            *conf_filename;              /* configuration filename */
     uint16_t        stats_port;                  /* stats monitoring port */
     int             stats_interval;              /* stats aggregation interval */

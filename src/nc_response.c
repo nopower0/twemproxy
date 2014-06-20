@@ -212,6 +212,26 @@ rsp_forward_stats(struct context *ctx, struct server *server, struct msg *msg)
 }
 
 static void
+rsp_forward_log(struct msg *req_msg, struct msg *rsp_msg)
+{
+    if (req_msg == NULL || rsp_msg == NULL) {
+        return;
+    }
+    struct conn *c_conn = req_msg->owner;
+    if (c_conn == NULL) {
+        return;
+    }
+
+    uint32_t key_len = (uint32_t)(req_msg->key_end - req_msg->key_start);
+    log_access("ACCESS %s %s %.*s%s rb %"PRIu32" sb %"PRIu32" e %d",
+         nc_unresolve_peer_desc(c_conn->sd), 
+         msg_type_string(req_msg->type),
+         (key_len < 32 ? key_len : 32), req_msg->key_start,
+         (key_len > 32 ? "..." : ""),
+         req_msg->mlen, rsp_msg->mlen, req_msg->error);
+} 
+
+static void
 rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
 {
     rstatus_t status;
@@ -245,6 +265,9 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
         if (status != NC_OK) {
             c_conn->err = errno;
         }
+        
+        // print request and response info into access log
+        rsp_forward_log(pmsg, msg);
     }
 
     rsp_forward_stats(ctx, s_conn->owner, msg);
@@ -316,6 +339,9 @@ rsp_send_next(struct context *ctx, struct conn *conn)
         msg->peer = pmsg;
         pmsg->peer = msg;
         stats_pool_incr(ctx, conn->owner, forward_error);
+        
+        // print request and response info into access log
+        rsp_forward_log(pmsg, msg);
     } else {
         msg = pmsg->peer;
     }

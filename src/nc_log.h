@@ -40,6 +40,8 @@ struct logger {
     int  fd;     /* log file descriptor */
     int  nerror; /* # log error */
     int  limit;  /* # limit per 100ms per level */
+    int  access_sampling;    /* access sampling every n msg */
+    uint64_t access_counter; /* access counter */
     int64_t last_time;       /* # last log time */
     int  count[LOG_N_LEVEL]; /* # log per level */
 };
@@ -139,17 +141,24 @@ struct logger {
     if (log_loggable(_level) != 0) {                                        \
         _log(_level, __FILE__, __LINE__, 0, __VA_ARGS__);                   \
         _log_hexdump(_level, __FILE__, __LINE__, (char *)(_data),           \
-                     (int)(_datalen));                         \
+                     (int)(_datalen));                                      \
     }                                                                       \
 } while (0)
 
-int log_init(int level, char *filename, int log_limit);
+#define log_access(...) do {                                                \
+    if (log_access_loggable(LOG_NOTICE) != 0) {                             \
+        _log(LOG_NOTICE, __FILE__, __LINE__, 0, __VA_ARGS__);               \
+    }                                                                       \
+} while (0)
+
+int log_init(int level, char *filename, int limit, int access_sampling);
 void log_deinit(void);
 void log_level_up(void);
 void log_level_down(void);
 void log_level_set(int level);
 void log_reopen(void);
 int log_loggable(int level);
+int log_access_loggable(int level);
 const char *_log_level_str(int level);
 bool _log_reach_limit(int level, int64_t usec);
 void _log(int level, const char *file, int line, int panic,

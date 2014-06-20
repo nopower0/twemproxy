@@ -835,3 +835,131 @@ msg_send(struct context *ctx, struct conn *conn)
 
     return NC_OK;
 }
+
+const char *
+msg_type_string(msg_type_t type)
+{
+    static const char *type_strings[] = {
+        "unknown",
+        "get",                /* memcache retrieval requests */
+        "gets",
+        "delete",             /* memcache delete request */
+        "cas",                /* memcache cas request and storage request */
+        "set",                /* memcache storage request */
+        "add",
+        "replace",
+        "append",
+        "prepend",
+        "incr",               /* memcache arithmetic request */
+        "decr",
+        "quit",               /* memcache quit request */
+        "num",                /* memcache arithmetic response */
+        "stored",             /* memcache cas and storage response */
+        "not_stored",
+        "exists",
+        "not_found",
+        "end",
+        "value",
+        "deleted",            /* memcache delete response */
+        "error",              /* memcache error responses */
+        "client_error",
+        "server_error",
+        "del",                /* redis commands - keys */
+        "exists",
+        "expire",
+        "expireat",
+        "pexpire",
+        "pexpireat",
+        "persist",
+        "pttl",
+        "ttl",
+        "type",
+        "append",             /* redis requests - string */
+        "bitcount",
+        "decr",
+        "decrby",
+        "dump",
+        "get",
+        "getbit",
+        "getrange",
+        "getset",
+        "incr",
+        "incrby",
+        "incrbyfloat",
+        "mget",
+        "psetex",
+        "restore",
+        "set",
+        "setbit",
+        "setex",
+        "setnx",
+        "setrange",
+        "strlen",
+        "hdel",               /* redis requests - hashes */
+        "hexists",
+        "hget",
+        "hgetall",
+        "hincrby",
+        "hincrbyfloat",
+        "hkeys",
+        "hlen",
+        "hmget",
+        "hmset",
+        "hset",
+        "hsetnx",
+        "hvals",
+        "lindex",             /* redis requests - lists */
+        "linsert",
+        "llen",
+        "lpop",
+        "lpush",
+        "lpushx",
+        "lrange",
+        "lrem",
+        "lset",
+        "ltrim",
+        "rpop",
+        "rpoplpush",
+        "rpush",
+        "rpushx",
+        "sadd",               /* redis requests - sets */
+        "scard",
+        "sdiff",
+        "sdiffstore",
+        "sinter",
+        "sinterstore",
+        "sismember",
+        "smembers",
+        "smove",
+        "spop",
+        "srandmember",
+        "srem",
+        "sunion",
+        "sunionstore",
+        "zadd",               /* redis requests - sorted sets */
+        "zcard",
+        "zcount",
+        "zincrby",
+        "zinterstore",
+        "zrange",
+        "zrangebyscore",
+        "zrank",
+        "zrem",
+        "zremrangebyrank",
+        "zremrangebyscore",
+        "zrevrange",
+        "zrevrangebyscore",
+        "zrevrank",
+        "zscore",
+        "zunionstore",
+        "eval",               /* redis requests - eval */
+        "evalsha",
+        "status",             /* redis response */
+        "error",
+        "integer",
+        "bulk",
+        "multibulk",
+        "MAX"
+    };
+    return type_strings[type];
+}
