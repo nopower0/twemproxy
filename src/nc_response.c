@@ -226,8 +226,8 @@ rsp_forward_log(struct msg *req_msg, struct msg *rsp_msg)
     log_access("ACCESS %s %s %.*s%s rb %"PRIu32" sb %"PRIu32" e %d",
          nc_unresolve_peer_desc(c_conn->sd), 
          msg_type_string(req_msg->type),
-         (key_len < 32 ? key_len : 32), req_msg->key_start,
-         (key_len > 32 ? "..." : ""),
+         (key_len < 64 ? key_len : 64), req_msg->key_start,
+         (key_len > 64 ? "..." : ""),
          req_msg->mlen, rsp_msg->mlen, req_msg->error);
 } 
 

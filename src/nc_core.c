@@ -227,7 +227,7 @@ core_close(struct context *ctx, struct conn *conn)
         type = conn->proxy ? 'p' : 's';
         addrstr = nc_unresolve_addr(conn->addr, conn->addrlen);
     }
-    log_debug(type == 'c' ? LOG_INFO : LOG_WARN,
+    log_debug(type == 'c' ? LOG_NOTICE : LOG_WARN,
               "close %c %d '%s' on event %04"PRIX32" eof %d done "
               "%d rb %zu sb %zu%c %s", type, conn->sd, addrstr, conn->events,
               conn->eof, conn->done, conn->recv_bytes, conn->send_bytes,

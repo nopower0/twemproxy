@@ -213,8 +213,8 @@ nc_show_usage(void)
         "Usage: nutcracker [-?hVdDt] [-v verbosity level] [-o output file]" CRLF
         "                  [-c conf file] [-s stats port] [-a stats addr]" CRLF
         "                  [-i stats interval] [-p pid file] [-m mbuf size]" CRLF
-        "                  [-l output limit per 100ms per level]" CRLF
-        "                  [-r output access sampling]" CRLF
+        "                  [-l logging limit per 100ms per level]" CRLF
+        "                  [-r logging access sampling]" CRLF
         "");
     log_stderr(
         "Options:" CRLF
