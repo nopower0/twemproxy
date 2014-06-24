@@ -35,7 +35,7 @@ fi
 if [[ ! -e Makefile ]]; then
     echo
     echo '## Makefile is not found, configure ... ##'
-    if [[ $is_expecting_debug ]]; then
+    if [[ $is_expecting_debug == 1 ]]; then
         CFLAGS=-g CXXFLAGS=-g ./configure --enable-debug=full
     else
         ./configure --enable-debug=log

@@ -1,4 +1,4 @@
 all:
 	gcc -c buildinfo.c -DBUILDINFO=\"`./buildinfo.sh`\"
 clean:
-	rm buildinfo.o
+	rm -f buildinfo.o
