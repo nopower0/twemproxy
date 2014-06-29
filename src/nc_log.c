@@ -115,8 +115,15 @@ int
 log_loggable(int level)
 {
     struct logger *l = &logger;
+    int64_t now;
 
     if (level > l->level) {
+        return 0;
+    }
+
+    now = nc_usec_now();
+    if (level > 0 && level < LOG_N_LEVEL
+            && l->limit > 0 && _log_reach_limit(level, now)) {
         return 0;
     }
 
@@ -219,7 +226,7 @@ _log(int level, const char *file, int line, int panic, const char *fmt, ...)
     char timestr[64];
     va_list args;
     int64_t now;
-    time_t t;
+    time_t now_t;
     struct tm *local;
     ssize_t n;
 
@@ -232,14 +239,9 @@ _log(int level, const char *file, int line, int panic, const char *fmt, ...)
     size = LOG_MAX_LEN; /* size of output buffer */
 
     now = nc_usec_now();
-    t = now / 1000000;
-    local = localtime(&t);
+    now_t = now / 1000000;
+    local = localtime(&now_t);
     strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", local);
-
-    if (level > 0 && level < LOG_N_LEVEL
-            && l->limit > 0 && _log_reach_limit(level, now)) {
-        return;
-    }
 
     len += nc_scnprintf(buf + len, size - len, "%.*s.%06d %s %s:%d ",
                         strlen(timestr), timestr, now % 1000000,
