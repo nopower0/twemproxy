@@ -185,9 +185,9 @@ _log_reach_limit(int level, int64_t now)
         }
         if (suppressed > 0) {
             /* loga use -1 as level, so it will not be recursively */
-            loga("LOG SUPPRESSED:%d, EMERG:%d, ALERT:%d, CRIT:%d, ERROR:%d, "
-                 "WARN:%d, NOTICE:%d, INFO:%d, DEBUG:%d, VERB:%d, VVERB:%d, "
-                 "VVVERB:%d, PVERB:%d",
+            loga("LOG SUPPRESSED %d : EMERG %d ALERT %d CRIT %d ERROR %d "
+                 "WARN %d NOTICE %d INFO %d DEBUG %d VERB %d VVERB %d "
+                 "VVVERB %d PVERB %d",
                  suppressed,
                  POSITIVE(l->count[0] - l->limit),
                  POSITIVE(l->count[1] - l->limit),
