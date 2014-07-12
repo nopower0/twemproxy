@@ -22,11 +22,14 @@
 #include <nc_server.h>
 #include <nc_conf.h>
 
+#define SERVER_MAX_CANDIDATES 64 /* should be enough when route read requests */
+
 void
 server_ref(struct conn *conn, void *owner)
 {
     struct server *server = owner;
 
+    ASSERT(conn != NULL && owner != NULL);
     ASSERT(!conn->client && !conn->proxy);
     ASSERT(conn->owner == NULL);
 
@@ -36,6 +39,7 @@ server_ref(struct conn *conn, void *owner)
 
     server->ns_conn_q++;
     TAILQ_INSERT_TAIL(&server->s_conn_q, conn, conn_tqe);
+    ASSERT(!TAILQ_EMPTY(&server->s_conn_q));
 
     conn->owner = owner;
 
@@ -106,47 +110,98 @@ server_active(struct conn *conn)
     return false;
 }
 
-static rstatus_t
-server_each_set_owner(void *elem, void *data)
-{
-    struct server *s = elem;
-    struct server_pool *sp = data;
-
-    s->owner = sp;
-
-    return NC_OK;
-}
-
 rstatus_t
 server_init(struct array *server, struct array *conf_server,
             struct server_pool *sp)
 {
-    rstatus_t status;
-    uint32_t nserver;
+    /*
+     * Originaly, every server will occupy a position in the pool distribution.
+     * In order to support slave hosts, we combine the master and all its
+     * slaves into a group, and this group will occupy one position in the pool
+     * distribution. If so, distribution calcuation will stay the same.
+     *
+     * The master should be the stub server of its group, and all its slaves
+     * will be appended into the slave_pool.
+     * If the master is not configed, the first slave will act as the stub
+     * server. But don't worry, the write request will not routed to it,
+     * because we would check the slave flag. Moreover, this slave will NOT
+     * pushed into the slave_pool.
+     */
 
-    nserver = array_n(conf_server);
-    ASSERT(nserver != 0);
+    ASSERT(array_n(conf_server) != 0);
     ASSERT(array_n(server) == 0);
 
-    status = array_init(server, nserver, sizeof(struct server));
+    rstatus_t status;
+    uint32_t i, nstub, nserver, slave_pool_size;
+    struct conf_server *cs;
+    struct server *s, *last_stub;
+
+    /* We precalloc the server array to make sure not realloc, which may waste
+     * some memory. The same for slave_pool_size. */
+    slave_pool_size = array_n(conf_server);
+    status = array_init(server, array_n(conf_server), sizeof(struct server));
     if (status != NC_OK) {
         return status;
     }
 
-    /* transform conf server to server */
-    status = array_each(conf_server, conf_server_each_transform, server);
-    if (status != NC_OK) {
-        server_deinit(server);
-        return status;
-    }
-    ASSERT(array_n(server) == nserver);
+    nstub = 0;
+    nserver = 0;
+    last_stub = NULL;
+    /* conf_server is already sorted by name+slave in conf_validate_server */
+    for (i = 0; i < array_n(conf_server); i++) {
+        cs = array_get(conf_server, i);
 
-    /* set server owner */
-    status = array_each(server, server_each_set_owner, sp);
-    if (status != NC_OK) {
-        server_deinit(server);
-        return status;
+        if (last_stub == NULL
+            || string_compare(&cs->name, &last_stub->name) != 0) {
+            /* this server belongs a new name */
+            s = array_push(server);
+            ASSERT(s != NULL);
+            nstub++;
+            last_stub = s;
+
+            s->idx = array_idx(server, s);
+            s->sidx = nserver++;
+            s->owner = sp;
+            status = conf_server_transform(cs, s, slave_pool_size);
+            if (status != NC_OK) {
+                server_deinit(server);
+                return status;
+            }
+            ASSERT(array_n(&s->slave_pool) == 0);
+
+            if (s->local) {
+                last_stub->local_server = s; /* last local win */
+            }
+
+            log_debug(LOG_VERB, "server init server %"PRIu32" stub '%.*s' %s",
+                      s->idx, s->pname.len, s->pname.data,
+                      (s->slave == 0 ? "master" : "slave"));
+        } else {
+            /* this server belongs the same name */
+            s = array_push(&last_stub->slave_pool);
+            ASSERT(s != NULL);
+
+            s->idx = array_idx(&last_stub->slave_pool, s);
+            s->sidx = nserver++;
+            s->owner = sp;
+            status = conf_server_transform(cs, s, 0);
+            if (status != NC_OK) {
+                server_deinit(server);
+                return status;
+            }
+
+            if (s->local) {
+                last_stub->local_server = s; /* last local win */
+            }
+
+            log_debug(LOG_VERB, "server init server %"PRIu32" slave_pool "
+                      "%"PRIu32" '%.*s' %s",
+                      last_stub->idx, s->idx, s->pname.len, s->pname.data,
+                      (s->slave == 0 ? "master" : "slave"));
+        }
     }
+    ASSERT(array_n(server) == nstub);
+    ASSERT(array_n(conf_server) == nserver);
 
     log_debug(LOG_DEBUG, "init %"PRIu32" servers in pool %"PRIu32" '%.*s'",
               nserver, sp->idx, sp->name.len, sp->name.data);
@@ -164,7 +219,11 @@ server_deinit(struct array *server)
 
         s = array_pop(server);
         ASSERT(TAILQ_EMPTY(&s->s_conn_q) && s->ns_conn_q == 0);
+
+        server_deinit(&s->slave_pool);
+        array_deinit(&s->slave_pool);
     }
+
     array_deinit(server);
 }
 
@@ -248,15 +307,11 @@ server_each_disconnect(void *elem, void *data)
 }
 
 static void
-server_failure(struct context *ctx, struct server *server)
+_server_failure(struct context *ctx, struct server *server, bool update_pool)
 {
     struct server_pool *pool = server->owner;
     int64_t now, next;
     rstatus_t status;
-
-    if (!pool->auto_eject_hosts) {
-        return;
-    }
 
     server->failure_count++;
 
@@ -274,23 +329,42 @@ server_failure(struct context *ctx, struct server *server)
     }
 
     stats_server_set_ts(ctx, server, server_ejected_at, now);
+    stats_pool_incr(ctx, pool, server_ejects);
 
     next = now + pool->server_retry_timeout;
+    server->failure_count = 0;
+    server->next_retry = next;
+
+    if (!update_pool) {
+        return;
+    }
 
     log_warn("update pool %"PRIu32" '%.*s' to delete server '%.*s' "
              "for next %"PRIu32" secs", pool->idx, pool->name.len,
              pool->name.data, server->pname.len, server->pname.data,
              pool->server_retry_timeout / 1000 / 1000);
 
-    stats_pool_incr(ctx, pool, server_ejects);
-
-    server->failure_count = 0;
-    server->next_retry = next;
-
     status = server_pool_run(pool);
     if (status != NC_OK) {
         log_error("updating pool %"PRIu32" '%.*s' failed: %s", pool->idx,
                   pool->name.len, pool->name.data, strerror(errno));
+    }
+}
+
+static void
+server_failure(struct context *ctx, struct server *server)
+{
+    struct server_pool *pool = server->owner;
+
+    if (server->slave || array_n(&server->slave_pool) > 0) {
+        /*
+         * If server is slave, auto_eject_hosts should be false,
+         * which is already checked in conf.
+         * Here, we only mark failure without update the pool.
+         */
+        _server_failure(ctx, server, false);
+    } else if (pool->auto_eject_hosts) {
+        _server_failure(ctx, server, true);
     }
 }
 
@@ -654,9 +728,101 @@ server_pool_server(struct server_pool *pool, uint8_t *key, uint32_t keylen)
     return server;
 }
 
+static struct server *
+server_pool_server_balance(struct server_pool *pool, struct server *stub,
+                           bool is_read, uint32_t hint)
+{
+    int64_t now;
+    if (!is_read) { /* write request */
+        if (stub->slave) {
+            log_warn("no server for write request in pool '%.*s'",
+                     pool->name.len, pool->name.data);
+            return NULL;
+        } else {
+            log_debug(LOG_DEBUG, "write request balance to server '%.*s'",
+                      stub->pname.len, stub->pname.data);
+            return stub;
+        }
+    }
+
+    if (array_n(&stub->slave_pool) == 0) {
+        log_debug(LOG_DEBUG, "read request balance to the only server '%.*s'",
+                  stub->pname.len, stub->pname.data);
+        return stub;
+    }
+
+    now = nc_usec_now();
+    if (now < 0) {
+        return NULL;
+    }
+
+    /* Prefer the master when it's available */
+    if (pool->read_prefer == READ_PREFER_MASTER
+        && !stub->slave && stub->next_retry <= now) {
+        log_debug(LOG_DEBUG, "read request balance to master %.*s",
+                  stub->pname.len, stub->pname.data);
+        return stub;
+    }
+
+    /*
+     * Prefer the server at local when it's available, and
+     * 1. we prefer slave and it's a slave
+     * 2. or we prefer none
+     */
+    if (stub->local_server && stub->local_server->next_retry <= now
+        && ((pool->read_prefer == READ_PREFER_SLAVE && stub->local_server->slave)
+            || pool->read_prefer == READ_PREFER_NONE)) {
+        log_debug(LOG_DEBUG, "read request balance to local server '%.*s'",
+                  stub->local_server->pname.len, stub->local_server->pname.data);
+        return stub->local_server;
+    }
+
+    /* now, we try to filter servers available and select it based on client */
+
+    struct server *candidates[SERVER_MAX_CANDIDATES] = {NULL};
+    uint32_t i, num;
+    /*
+     * Add stub into candidates, if
+     * 1. stub is slave
+     * 2. or stub is master and we don't prefer the slave
+     */
+    num = 0;
+    if (stub->next_retry <= now && (stub->slave
+        || (!stub->slave && pool->read_prefer != READ_PREFER_SLAVE))) {
+        candidates[num++] = stub;
+        log_debug(LOG_VERB, "read request balance add candidate '%.*s'",
+                  stub->pname.len, stub->pname.data);
+    }
+    for (i = 0; i < array_n(&stub->slave_pool); i++) {
+        if (num >= SERVER_MAX_CANDIDATES) {
+            break;
+        }
+        struct server *s = array_get(&stub->slave_pool, i);
+        ASSERT(s != NULL);
+        if (s->next_retry <= now) {
+            candidates[num++] = s;
+            log_debug(LOG_VERB, "read request balance add candidate '%.*s'",
+                      s->pname.len, s->pname.data);
+        }
+    }
+
+    if (num > 0) {
+        struct server *s = candidates[hint % num];
+        log_debug(LOG_DEBUG, "read request balance to server '%.*s' "
+                  "hint %"PRIu32"", s->pname.len, s->pname.data, hint);
+        return s;
+    }
+
+    /* Failover to stub if no server is available. Maybe stub is in failure,
+     * but we have no better idea */
+    log_debug(LOG_DEBUG, "no slave for read request, failover to '%.*s'",
+              stub->pname.len, stub->pname.data);
+    return stub;
+}
+
 struct conn *
 server_pool_conn(struct context *ctx, struct server_pool *pool, uint8_t *key,
-                 uint32_t keylen)
+                 uint32_t keylen, bool is_read, uint32_t hint)
 {
     rstatus_t status;
     struct server *server;
@@ -669,6 +835,12 @@ server_pool_conn(struct context *ctx, struct server_pool *pool, uint8_t *key,
 
     /* from a given {key, keylen} pick a server from pool */
     server = server_pool_server(pool, key, keylen);
+    if (server == NULL) {
+        return NULL;
+    }
+
+    /* route read request to slaves if possible */
+    server = server_pool_server_balance(pool, server, is_read, hint);
     if (server == NULL) {
         return NULL;
     }

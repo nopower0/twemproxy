@@ -26,6 +26,12 @@
 #include <nc_core.h>
 #include <hashkit/nc_hashkit.h>
 
+typedef enum read_prefer_type {
+    READ_PREFER_NONE,
+    READ_PREFER_MASTER,
+    READ_PREFER_SLAVE
+} read_prefer_type_t;
+
 #define CONF_OK             (void *) NULL
 #define CONF_ERROR          (void *) "has an invalid value"
 
@@ -40,9 +46,11 @@
 #define CONF_UNSET_PTR  NULL
 #define CONF_UNSET_HASH (hash_type_t) -1
 #define CONF_UNSET_DIST (dist_type_t) -1
+#define CONF_UNSET_READ_PREFER (read_prefer_type_t) -1
 
 #define CONF_DEFAULT_HASH                    HASH_FNV1A_64
 #define CONF_DEFAULT_DIST                    DIST_KETAMA
+#define CONF_DEFAULT_READ_PREFER             READ_PREFER_NONE
 #define CONF_DEFAULT_TIMEOUT                 -1
 #define CONF_DEFAULT_LISTEN_BACKLOG          512
 #define CONF_DEFAULT_CLIENT_CONNECTIONS      0
@@ -69,6 +77,8 @@ struct conf_server {
     int             weight;     /* weight */
     struct sockinfo info;       /* connect socket info */
     unsigned        valid:1;    /* valid? */
+    unsigned        slave:1;    /* is slave? */
+    unsigned        local:1;    /* is local? */
 };
 
 struct conf_pool {
@@ -77,6 +87,7 @@ struct conf_pool {
     hash_type_t        hash;                  /* hash: */
     struct string      hash_tag;              /* hash_tag: */
     dist_type_t        distribution;          /* distribution: */
+    read_prefer_type_t read_prefer;           /* read prefer master or slave */
     int                timeout;               /* timeout: */
     int                backlog;               /* backlog: */
     int                client_connections;    /* client_connections: */
@@ -124,8 +135,10 @@ char *conf_set_bool(struct conf *cf, struct command *cmd, void *conf);
 char *conf_set_hash(struct conf *cf, struct command *cmd, void *conf);
 char *conf_set_distribution(struct conf *cf, struct command *cmd, void *conf);
 char *conf_set_hashtag(struct conf *cf, struct command *cmd, void *conf);
+char *conf_set_read_prefer(struct conf *cf, struct command *cmd, void *conf);
 
-rstatus_t conf_server_each_transform(void *elem, void *data);
+rstatus_t conf_server_transform(struct conf_server *cs, struct server *s,
+                                uint32_t nslave);
 rstatus_t conf_pool_each_transform(void *elem, void *data);
 
 struct conf *conf_create(char *filename);

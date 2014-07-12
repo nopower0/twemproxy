@@ -210,5 +210,6 @@ int nc_resolve(struct string *name, int port, struct sockinfo *si);
 char *nc_unresolve_addr(struct sockaddr *addr, socklen_t addrlen);
 char *nc_unresolve_peer_desc(int sd);
 char *nc_unresolve_desc(int sd);
+bool nc_is_local_addr(const char *ip, size_t iplen);
 
 #endif

@@ -71,7 +71,11 @@ struct stats_metric {
 };
 
 struct stats_server {
+    uint32_t idx;         /* index */
     struct string name;   /* server name (ref) */
+    struct string pname;  /* pname (ref) */
+    unsigned slave:1;     /* is slave? */
+    unsigned local:1;     /* is local? */
     struct array  metric; /* stats_metric[] for server codec */
 };
 
@@ -114,6 +118,13 @@ struct stats {
     struct string       rusage_system_str;      /* rusage user */
     struct string       total_connections_str;  /* total_connections string */
     struct string       curr_connections_str;   /* curr_connections string */
+
+    struct string       name_str;       /* name string (for server header) */
+    struct string       pname_str;      /* pname string (for server header) */
+    struct string       role_str;       /* role string (for server header) */
+    struct string       master_str;     /* master string (for server header) */
+    struct string       slave_str;      /* slave string (for server header) */
+    struct string       local_str;      /* local string (for server header) */
 
     volatile int        aggregate;      /* shadow (b) aggregate? */
     volatile int        updated;        /* current (a) updated? */

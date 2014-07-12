@@ -156,6 +156,10 @@ core_start(struct instance *nci)
 {
     struct context *ctx;
 
+    if (!msg_type_check()) {
+        return NULL;
+    }
+
     mbuf_init(nci);
     msg_init();
     conn_init();

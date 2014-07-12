@@ -30,6 +30,8 @@
 
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <ifaddrs.h>
+#include <arpa/inet.h>
 
 #include <nc_core.h>
 
@@ -622,4 +624,48 @@ nc_unresolve_desc(int sd)
     }
 
     return nc_unresolve_addr(addr, addrlen);
+}
+
+/*
+ * Check whether the ip is a local address. IPv6 supported.
+ *
+ * This routine is not reentrant
+ */
+bool
+nc_is_local_addr(const char *addr, size_t iplen)
+{
+    #define MAX_NUM 64 /* 64 should be enough */
+    static char all[MAX_NUM][INET6_ADDRSTRLEN];
+    static int count = 0;
+
+    if (count == 0) {
+        strcpy(all[count++], "localhost");
+
+        struct ifaddrs *addrs = NULL;
+        struct ifaddrs *i = NULL;
+        void *tmp = NULL;
+
+        getifaddrs(&addrs);
+
+        for (i = addrs; i != NULL && count < MAX_NUM; i = i->ifa_next) {
+            if (i->ifa_addr->sa_family == AF_INET) { /* IP4 Address */
+                tmp = &((struct sockaddr_in *)i->ifa_addr)->sin_addr;
+                inet_ntop(AF_INET, tmp, all[count++], INET6_ADDRSTRLEN);
+            } else if (i->ifa_addr->sa_family==AF_INET6) { /* IP6 Address */
+                tmp=&((struct sockaddr_in6 *)i->ifa_addr)->sin6_addr;
+                inet_ntop(AF_INET6, tmp, all[count++], INET6_ADDRSTRLEN);
+            }
+        }
+        if (addrs!=NULL) {
+            freeifaddrs(addrs);
+        }
+    }
+
+    int i;
+    for (i = 0; i < count; i++) {
+        if (strncmp(addr, all[i], iplen) == 0) {
+            return true;
+        }
+    }
+    return false;
 }

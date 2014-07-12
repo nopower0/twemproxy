@@ -838,130 +838,201 @@ msg_send(struct context *ctx, struct conn *conn)
     return NC_OK;
 }
 
+typedef enum msg_rw_type {
+    MSG_RW_UNKNOWN,
+    MSG_RW_READ,
+    MSG_RW_WRITE
+} msg_rw_type_t;
+
+typedef struct msg_type_info {
+    msg_type_t type;
+    const char *str;
+    msg_rw_type_t rw_type;
+} msg_type_info_t;
+
+static msg_type_info_t type_info[] = {
+    { MSG_UNKNOWN,                    "unknown",          MSG_RW_UNKNOWN },
+
+    /* memcache retrieval requests */
+    { MSG_REQ_MC_GET,                 "get",              MSG_RW_READ },
+    { MSG_REQ_MC_GETS,                "gets",             MSG_RW_WRITE },
+
+    /* memcache delete request */
+    { MSG_REQ_MC_DELETE,              "delete",           MSG_RW_WRITE },
+
+    /* memcache cas request and storage request */
+    { MSG_REQ_MC_CAS,                 "cas",              MSG_RW_WRITE },
+
+    /* memcache storage request */
+    { MSG_REQ_MC_SET,                 "set",              MSG_RW_WRITE },
+    { MSG_REQ_MC_ADD,                 "add",              MSG_RW_WRITE },
+    { MSG_REQ_MC_REPLACE,             "replace",          MSG_RW_WRITE },
+    { MSG_REQ_MC_APPEND,              "append",           MSG_RW_WRITE },
+    { MSG_REQ_MC_PREPEND,             "prepend",          MSG_RW_WRITE },
+
+    /* memcache arithmetic request */
+    { MSG_REQ_MC_INCR,                "incr",             MSG_RW_WRITE },
+    { MSG_REQ_MC_DECR,                "decr",             MSG_RW_WRITE },
+
+    /* memcache quit request */
+    { MSG_REQ_MC_QUIT,                "quit",             MSG_RW_UNKNOWN },
+
+    /* memcache arithmetic response */
+    { MSG_RSP_MC_NUM,                 "num",              MSG_RW_UNKNOWN },
+
+    /* memcache cas and storage response */
+    { MSG_RSP_MC_STORED,              "stored",           MSG_RW_UNKNOWN },
+    { MSG_RSP_MC_NOT_STORED,          "not_stored",       MSG_RW_UNKNOWN },
+    { MSG_RSP_MC_EXISTS,              "exists",           MSG_RW_UNKNOWN },
+    { MSG_RSP_MC_NOT_FOUND,           "not_found",        MSG_RW_UNKNOWN },
+    { MSG_RSP_MC_END,                 "end",              MSG_RW_UNKNOWN },
+    { MSG_RSP_MC_VALUE,               "value",            MSG_RW_UNKNOWN },
+
+    /* memcache delete response */
+    { MSG_RSP_MC_DELETED,             "deleted",          MSG_RW_UNKNOWN },
+
+    /* memcache error responses */
+    { MSG_RSP_MC_ERROR,               "error",            MSG_RW_UNKNOWN },
+    { MSG_RSP_MC_CLIENT_ERROR,        "client_error",     MSG_RW_UNKNOWN },
+    { MSG_RSP_MC_SERVER_ERROR,        "server_error",     MSG_RW_UNKNOWN },
+
+    /* redis commands - keys */
+    { MSG_REQ_REDIS_DEL,              "del",              MSG_RW_WRITE },
+    { MSG_REQ_REDIS_EXISTS,           "exists",           MSG_RW_READ },
+    { MSG_REQ_REDIS_EXPIRE,           "expire",           MSG_RW_WRITE },
+    { MSG_REQ_REDIS_EXPIREAT,         "expireat",         MSG_RW_WRITE },
+    { MSG_REQ_REDIS_PEXPIRE,          "pexpire",          MSG_RW_WRITE },
+    { MSG_REQ_REDIS_PEXPIREAT,        "pexpireat",        MSG_RW_WRITE },
+    { MSG_REQ_REDIS_PERSIST,          "persist",          MSG_RW_WRITE },
+    { MSG_REQ_REDIS_PTTL,             "pttl",             MSG_RW_READ },
+    { MSG_REQ_REDIS_TTL,              "ttl",              MSG_RW_READ },
+    { MSG_REQ_REDIS_TYPE,             "type",             MSG_RW_READ },
+
+    /* redis requests - string */
+    { MSG_REQ_REDIS_APPEND,           "append",           MSG_RW_WRITE },
+    { MSG_REQ_REDIS_BITCOUNT,         "bitcount",         MSG_RW_READ },
+    { MSG_REQ_REDIS_DECR,             "decr",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_DECRBY,           "decrby",           MSG_RW_WRITE },
+    { MSG_REQ_REDIS_DUMP,             "dump",             MSG_RW_READ },
+    { MSG_REQ_REDIS_GET,              "get",              MSG_RW_READ },
+    { MSG_REQ_REDIS_GETBIT,           "getbit",           MSG_RW_READ },
+    { MSG_REQ_REDIS_GETRANGE,         "getrange",         MSG_RW_READ },
+    { MSG_REQ_REDIS_GETSET,           "getset",           MSG_RW_WRITE },
+    { MSG_REQ_REDIS_INCR,             "incr",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_INCRBY,           "incrby",           MSG_RW_WRITE },
+    { MSG_REQ_REDIS_INCRBYFLOAT,      "incrbyfloat",      MSG_RW_WRITE },
+    { MSG_REQ_REDIS_MGET,             "mget",             MSG_RW_READ },
+    { MSG_REQ_REDIS_PSETEX,           "psetex",           MSG_RW_WRITE },
+    { MSG_REQ_REDIS_RESTORE,          "restore",          MSG_RW_WRITE },
+    { MSG_REQ_REDIS_SET,              "set",              MSG_RW_WRITE },
+    { MSG_REQ_REDIS_SETBIT,           "setbit",           MSG_RW_WRITE },
+    { MSG_REQ_REDIS_SETEX,            "setex",            MSG_RW_WRITE },
+    { MSG_REQ_REDIS_SETNX,            "setnx",            MSG_RW_WRITE },
+    { MSG_REQ_REDIS_SETRANGE,         "setrange",         MSG_RW_WRITE },
+    { MSG_REQ_REDIS_STRLEN,           "strlen",           MSG_RW_READ },
+
+    /* redis requests - hashes */
+    { MSG_REQ_REDIS_HDEL,             "hdel",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_HEXISTS,          "hexists",          MSG_RW_READ },
+    { MSG_REQ_REDIS_HGET,             "hget",             MSG_RW_READ },
+    { MSG_REQ_REDIS_HGETALL,          "hgetall",          MSG_RW_READ },
+    { MSG_REQ_REDIS_HINCRBY,          "hincrby",          MSG_RW_WRITE },
+    { MSG_REQ_REDIS_HINCRBYFLOAT,     "hincrbyfloat",     MSG_RW_WRITE },
+    { MSG_REQ_REDIS_HKEYS,            "hkeys",            MSG_RW_READ },
+    { MSG_REQ_REDIS_HLEN,             "hlen",             MSG_RW_READ },
+    { MSG_REQ_REDIS_HMGET,            "hmget",            MSG_RW_READ },
+    { MSG_REQ_REDIS_HMSET,            "hmset",            MSG_RW_WRITE },
+    { MSG_REQ_REDIS_HSET,             "hset",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_HSETNX,           "hsetnx",           MSG_RW_WRITE },
+    { MSG_REQ_REDIS_HVALS,            "hvals",            MSG_RW_READ },
+
+    /* redis requests - lists */
+    { MSG_REQ_REDIS_LINDEX,           "lindex",           MSG_RW_READ },
+    { MSG_REQ_REDIS_LINSERT,          "linsert",          MSG_RW_WRITE },
+    { MSG_REQ_REDIS_LLEN,             "llen",             MSG_RW_READ },
+    { MSG_REQ_REDIS_LPOP,             "lpop",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_LPUSH,            "lpush",            MSG_RW_WRITE },
+    { MSG_REQ_REDIS_LPUSHX,           "lpushx",           MSG_RW_WRITE },
+    { MSG_REQ_REDIS_LRANGE,           "lrange",           MSG_RW_READ },
+    { MSG_REQ_REDIS_LREM,             "lrem",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_LSET,             "lset",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_LTRIM,            "ltrim",            MSG_RW_WRITE },
+    { MSG_REQ_REDIS_RPOP,             "rpop",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_RPOPLPUSH,        "rpoplpush",        MSG_RW_WRITE },
+    { MSG_REQ_REDIS_RPUSH,            "rpush",            MSG_RW_WRITE },
+    { MSG_REQ_REDIS_RPUSHX,           "rpushx",           MSG_RW_WRITE },
+
+    /* redis requests - sets */
+    { MSG_REQ_REDIS_SADD,             "sadd",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_SCARD,            "scard",            MSG_RW_READ },
+    { MSG_REQ_REDIS_SDIFF,            "sdiff",            MSG_RW_READ },
+    { MSG_REQ_REDIS_SDIFFSTORE,       "sdiffstore",       MSG_RW_WRITE },
+    { MSG_REQ_REDIS_SINTER,           "sinter",           MSG_RW_READ },
+    { MSG_REQ_REDIS_SINTERSTORE,      "sinterstore",      MSG_RW_WRITE },
+    { MSG_REQ_REDIS_SISMEMBER,        "sismember",        MSG_RW_READ },
+    { MSG_REQ_REDIS_SMEMBERS,         "smembers",         MSG_RW_READ },
+    { MSG_REQ_REDIS_SMOVE,            "smove",            MSG_RW_WRITE },
+    { MSG_REQ_REDIS_SPOP,             "spop",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_SRANDMEMBER,      "srandmember",      MSG_RW_READ },
+    { MSG_REQ_REDIS_SREM,             "srem",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_SUNION,           "sunion",           MSG_RW_READ },
+    { MSG_REQ_REDIS_SUNIONSTORE,      "sunionstore",      MSG_RW_WRITE },
+
+    /* redis requests - sorted sets */
+    { MSG_REQ_REDIS_ZADD,             "zadd",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_ZCARD,            "zcard",            MSG_RW_READ },
+    { MSG_REQ_REDIS_ZCOUNT,           "zcount",           MSG_RW_READ },
+    { MSG_REQ_REDIS_ZINCRBY,          "zincrby",          MSG_RW_WRITE },
+    { MSG_REQ_REDIS_ZINTERSTORE,      "zinterstore",      MSG_RW_WRITE },
+    { MSG_REQ_REDIS_ZRANGE,           "zrange",           MSG_RW_READ },
+    { MSG_REQ_REDIS_ZRANGEBYSCORE,    "zrangebyscore",    MSG_RW_READ },
+    { MSG_REQ_REDIS_ZRANK,            "zrank",            MSG_RW_READ },
+    { MSG_REQ_REDIS_ZREM,             "zrem",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_ZREMRANGEBYRANK,  "zremrangebyrank",  MSG_RW_WRITE },
+    { MSG_REQ_REDIS_ZREMRANGEBYSCORE, "zremrangebyscore", MSG_RW_WRITE },
+    { MSG_REQ_REDIS_ZREVRANGE,        "zrevrange",        MSG_RW_READ },
+    { MSG_REQ_REDIS_ZREVRANGEBYSCORE, "zrevrangebyscore", MSG_RW_READ },
+    { MSG_REQ_REDIS_ZREVRANK,         "zrevrank",         MSG_RW_READ },
+    { MSG_REQ_REDIS_ZSCORE,           "zscore",           MSG_RW_READ },
+    { MSG_REQ_REDIS_ZUNIONSTORE,      "zunionstore",      MSG_RW_WRITE },
+
+    /* redis requests - eval */
+    { MSG_REQ_REDIS_EVAL,             "eval",             MSG_RW_WRITE },
+    { MSG_REQ_REDIS_EVALSHA,          "evalsha",          MSG_RW_WRITE },
+
+    /* redis response */
+    { MSG_RSP_REDIS_STATUS,           "status",           MSG_RW_UNKNOWN },
+    { MSG_RSP_REDIS_ERROR,            "error",            MSG_RW_UNKNOWN },
+    { MSG_RSP_REDIS_INTEGER,          "integer",          MSG_RW_UNKNOWN },
+    { MSG_RSP_REDIS_BULK,             "bulk",             MSG_RW_UNKNOWN },
+    { MSG_RSP_REDIS_MULTIBULK,        "multibulk",        MSG_RW_UNKNOWN },
+    { MSG_SENTINEL,                   "MAX",              MSG_RW_UNKNOWN }
+};
+
+bool
+msg_type_check()
+{
+    unsigned i;
+    for (i = MSG_UNKNOWN; i < MSG_SENTINEL; i++) {
+        if (type_info[i].type != i) {
+            log_crit("msg type info %d mismatch %d %s",
+                     i, type_info[i].type, type_info[i].str);
+            return false;
+        }
+    }
+    return true;
+}
+
 const char *
 msg_type_string(msg_type_t type)
 {
-    static const char *type_strings[] = {
-        "unknown",
-        "get",                /* memcache retrieval requests */
-        "gets",
-        "delete",             /* memcache delete request */
-        "cas",                /* memcache cas request and storage request */
-        "set",                /* memcache storage request */
-        "add",
-        "replace",
-        "append",
-        "prepend",
-        "incr",               /* memcache arithmetic request */
-        "decr",
-        "quit",               /* memcache quit request */
-        "num",                /* memcache arithmetic response */
-        "stored",             /* memcache cas and storage response */
-        "not_stored",
-        "exists",
-        "not_found",
-        "end",
-        "value",
-        "deleted",            /* memcache delete response */
-        "error",              /* memcache error responses */
-        "client_error",
-        "server_error",
-        "del",                /* redis commands - keys */
-        "exists",
-        "expire",
-        "expireat",
-        "pexpire",
-        "pexpireat",
-        "persist",
-        "pttl",
-        "ttl",
-        "type",
-        "append",             /* redis requests - string */
-        "bitcount",
-        "decr",
-        "decrby",
-        "dump",
-        "get",
-        "getbit",
-        "getrange",
-        "getset",
-        "incr",
-        "incrby",
-        "incrbyfloat",
-        "mget",
-        "psetex",
-        "restore",
-        "set",
-        "setbit",
-        "setex",
-        "setnx",
-        "setrange",
-        "strlen",
-        "hdel",               /* redis requests - hashes */
-        "hexists",
-        "hget",
-        "hgetall",
-        "hincrby",
-        "hincrbyfloat",
-        "hkeys",
-        "hlen",
-        "hmget",
-        "hmset",
-        "hset",
-        "hsetnx",
-        "hvals",
-        "lindex",             /* redis requests - lists */
-        "linsert",
-        "llen",
-        "lpop",
-        "lpush",
-        "lpushx",
-        "lrange",
-        "lrem",
-        "lset",
-        "ltrim",
-        "rpop",
-        "rpoplpush",
-        "rpush",
-        "rpushx",
-        "sadd",               /* redis requests - sets */
-        "scard",
-        "sdiff",
-        "sdiffstore",
-        "sinter",
-        "sinterstore",
-        "sismember",
-        "smembers",
-        "smove",
-        "spop",
-        "srandmember",
-        "srem",
-        "sunion",
-        "sunionstore",
-        "zadd",               /* redis requests - sorted sets */
-        "zcard",
-        "zcount",
-        "zincrby",
-        "zinterstore",
-        "zrange",
-        "zrangebyscore",
-        "zrank",
-        "zrem",
-        "zremrangebyrank",
-        "zremrangebyscore",
-        "zrevrange",
-        "zrevrangebyscore",
-        "zrevrank",
-        "zscore",
-        "zunionstore",
-        "eval",               /* redis requests - eval */
-        "evalsha",
-        "status",             /* redis response */
-        "error",
-        "integer",
-        "bulk",
-        "multibulk",
-        "MAX"
-    };
-    return type_strings[type];
+    ASSERT(type > MSG_UNKNOWN && type < MSG_SENTINEL);
+    return type_info[type].str;
+}
+
+bool
+msg_type_is_read(msg_type_t type)
+{
+    ASSERT(type > MSG_UNKNOWN && type < MSG_SENTINEL);
+    return type_info[type].rw_type == MSG_RW_READ;
 }

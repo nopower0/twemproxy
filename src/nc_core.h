@@ -130,7 +130,6 @@ struct context {
     uint32_t           max_server_connections;  /* max # server connections */
 };
 
-
 struct instance {
     struct context  *ctx;                        /* active context */
     int             log_level;                   /* log level */

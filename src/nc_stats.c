@@ -173,7 +173,11 @@ stats_server_init(struct stats_server *sts, struct server *s)
 {
     rstatus_t status;
 
+    sts->idx = s->sidx; /* stats index */
     sts->name = s->name;
+    sts->pname = s->pname;
+    sts->slave = s->slave;
+    sts->local = s->local;
     array_null(&sts->metric);
 
     status = stats_server_metric_init(sts);
@@ -192,27 +196,45 @@ static rstatus_t
 stats_server_map(struct array *stats_server, struct array *server)
 {
     rstatus_t status;
-    uint32_t i, nserver;
+    uint32_t i, j, nserver;
 
-    nserver = array_n(server);
-    ASSERT(nserver != 0);
-
+    nserver = 0;
+    for (i = 0; i < array_n(server); i++) {
+        struct server *s = array_get(server, i);
+        nserver += 1 + array_n(&s->slave_pool);
+    }
     status = array_init(stats_server, nserver, sizeof(struct stats_server));
     if (status != NC_OK) {
         return status;
     }
 
-    for (i = 0; i < nserver; i++) {
+    ASSERT(array_n(stats_server) == 0);
+
+    for (i = 0; i < array_n(server); i++) {
         struct server *s = array_get(server, i);
         struct stats_server *sts = array_push(stats_server);
+        ASSERT(s->sidx == array_idx(stats_server, sts));
 
         status = stats_server_init(sts, s);
         if (status != NC_OK) {
             return status;
         }
+
+        for (j = 0; j < array_n(&s->slave_pool); j++) {
+            struct server *s_slave = array_get(&s->slave_pool, j);
+            struct stats_server *sts_slave = array_push(stats_server);
+            ASSERT(s_slave->sidx == array_idx(stats_server, sts_slave));
+
+            status = stats_server_init(sts_slave, s_slave);
+            if (status != NC_OK) {
+                return status;
+            }
+        }
     }
 
-    log_debug(LOG_VVVERB, "map %"PRIu32" stats servers", nserver);
+    ASSERT(array_n(stats_server) == nserver);
+
+    log_debug(LOG_VVVERB, "map %"PRIu32" stats servers", array_n(stats_server));
 
     return NC_OK;
 }
@@ -330,6 +352,7 @@ stats_pool_unmap(struct array *stats_pool)
 static rstatus_t
 stats_create_buf(struct stats *st)
 {
+    uint32_t int32_max_digits = 10;
     uint32_t int64_max_digits = 20; /* INT64_MAX = 9223372036854775807 */
     uint32_t key_value_extra = 8;   /* "key": "value", */
     uint32_t pool_extra = 8;        /* '"pool_name": { ' + ' }' */
@@ -399,8 +422,24 @@ stats_create_buf(struct stats *st)
             struct stats_server *sts = array_get(&stp->server, j);
             uint32_t k;
 
-            size += sts->name.len;
+            size += int32_max_digits; /* index */
             size += server_extra;
+
+            size += st->name_str.len;
+            size += sts->name.len;
+            size += key_value_extra;
+
+            size += st->pname_str.len;
+            size += sts->pname.len;
+            size += key_value_extra;
+
+            size += st->role_str.len;
+            size += st->master_str.len; /* len("master") > len("slave") */
+            size += key_value_extra;
+
+            size += st->local_str.len;
+            size += int32_max_digits;
+            size += key_value_extra;
 
             for (k = 0; k < array_n(&sts->metric); k++) {
                 struct stats_metric *stm = array_get(&sts->metric, k);
@@ -598,7 +637,33 @@ stats_add_footer(struct stats *st)
 }
 
 static rstatus_t
-stats_begin_nesting(struct stats *st, struct string *key)
+stats_add_server_header(struct stats *st, struct stats_server *sts)
+{
+    rstatus_t status;
+
+    status = stats_add_string(st, &st->name_str, &sts->name);
+    if (status != NC_OK) {
+        return status;
+    }
+    status = stats_add_string(st, &st->pname_str, &sts->pname);
+    if (status != NC_OK) {
+        return status;
+    }
+    status = stats_add_string(st, &st->role_str,
+                              (!sts->slave ? &st->master_str : &st->slave_str));
+    if (status != NC_OK) {
+        return status;
+    }
+    status = stats_add_num(st, &st->local_str, sts->local);
+    if (status != NC_OK) {
+        return status;
+    }
+
+    return NC_OK;
+}
+
+static rstatus_t
+stats_begin_nesting_key(struct stats *st, struct string *key)
 {
     struct stats_buffer *buf;
     uint8_t *pos;
@@ -610,6 +675,28 @@ stats_begin_nesting(struct stats *st, struct string *key)
     room = buf->size - buf->len - 1;
 
     n = nc_snprintf(pos, room, "\"%.*s\": {", key->len, key->data);
+    if (n < 0 || n >= (int)room) {
+        return NC_ERROR;
+    }
+
+    buf->len += (size_t)n;
+
+    return NC_OK;
+}
+
+static rstatus_t
+stats_begin_nesting_idx(struct stats *st, uint32_t idx)
+{
+    struct stats_buffer *buf;
+    uint8_t *pos;
+    size_t room;
+    int n;
+
+    buf = &st->buf;
+    pos = buf->data + buf->len;
+    room = buf->size - buf->len - 1;
+
+    n = nc_snprintf(pos, room, "\"%"PRIu32"\": {", idx);
     if (n < 0 || n >= (int)room) {
         return NC_ERROR;
     }
@@ -757,7 +844,7 @@ stats_make_rsp(struct stats *st)
         struct stats_pool *stp = array_get(&st->sum, i);
         uint32_t j;
 
-        status = stats_begin_nesting(st, &stp->name);
+        status = stats_begin_nesting_key(st, &stp->name);
         if (status != NC_OK) {
             return status;
         }
@@ -771,7 +858,12 @@ stats_make_rsp(struct stats *st)
         for (j = 0; j < array_n(&stp->server); j++) {
             struct stats_server *sts = array_get(&stp->server, j);
 
-            status = stats_begin_nesting(st, &sts->name);
+            status = stats_begin_nesting_idx(st, sts->idx);
+            if (status != NC_OK) {
+                return status;
+            }
+
+            status = stats_add_server_header(st, sts);
             if (status != NC_OK) {
                 return status;
             }
@@ -978,6 +1070,14 @@ stats_create(uint16_t stats_port, char *stats_ip, int stats_interval,
     string_set_text(&st->total_connections_str, "total_connections");
     string_set_text(&st->curr_connections_str, "curr_connections");
 
+    /* for server header */
+    string_set_text(&st->name_str, "name");
+    string_set_text(&st->pname_str, "pname");
+    string_set_text(&st->role_str, "role");
+    string_set_text(&st->master_str, "master");
+    string_set_text(&st->slave_str, "slave");
+    string_set_text(&st->local_str, "local");
+
     st->updated = 0;
     st->aggregate = 0;
 
@@ -1168,7 +1268,7 @@ stats_server_to_metric(struct context *ctx, struct server *server,
     struct stats_metric *stm;
     uint32_t pidx, sidx;
 
-    sidx = server->idx;
+    sidx = server->sidx; /* sidx is stats index */
     pidx = server->owner->idx;
 
     st = ctx->stats;

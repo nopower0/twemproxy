@@ -41,6 +41,13 @@ static struct string dist_strings[] = {
 };
 #undef DEFINE_ACTION
 
+static struct string read_prefer_strings[] = {
+    string("none"),
+    string("master"),
+    string("slave"),
+    null_string
+};
+
 static struct command conf_commands[] = {
     { string("listen"),
       conf_set_listen,
@@ -57,6 +64,10 @@ static struct command conf_commands[] = {
     { string("distribution"),
       conf_set_distribution,
       offsetof(struct conf_pool, distribution) },
+
+    { string("read_prefer"),
+      conf_set_read_prefer,
+      offsetof(struct conf_pool, read_prefer) },
 
     { string("timeout"),
       conf_set_num,
@@ -112,6 +123,8 @@ conf_server_init(struct conf_server *cs)
     memset(&cs->info, 0, sizeof(cs->info));
 
     cs->valid = 0;
+    cs->slave = 0;
+    cs->local = 0;
 
     log_debug(LOG_VVERB, "init conf server %p", cs);
 }
@@ -126,24 +139,20 @@ conf_server_deinit(struct conf_server *cs)
 }
 
 rstatus_t
-conf_server_each_transform(void *elem, void *data)
+conf_server_transform(struct conf_server *cs, struct server *s, uint32_t nslave)
 {
-    struct conf_server *cs = elem;
-    struct array *server = data;
-    struct server *s;
+    rstatus_t status;
 
     ASSERT(cs->valid);
 
-    s = array_push(server);
-    ASSERT(s != NULL);
-
-    s->idx = array_idx(server, s);
-    s->owner = NULL;
+    /* idx, sidx, owner should be initialized in server_init */
 
     s->pname = cs->pname;
     s->name = cs->name;
     s->port = (uint16_t)cs->port;
     s->weight = (uint32_t)cs->weight;
+    s->slave = cs->slave;
+    s->local = cs->local;
 
     s->family = cs->info.family;
     s->addrlen = cs->info.addrlen;
@@ -155,8 +164,20 @@ conf_server_each_transform(void *elem, void *data)
     s->next_retry = 0LL;
     s->failure_count = 0;
 
-    log_debug(LOG_VERB, "transform to server %"PRIu32" '%.*s'",
-              s->idx, s->pname.len, s->pname.data);
+    /* We precalloc the server array to make sure not realloc, which may waste
+     * some memory */
+    if (nslave > 0) {
+        status = array_init(&s->slave_pool, nslave, sizeof(struct server));
+        if (status != NC_OK) {
+            return status;
+        }
+    } else {
+        array_null(&s->slave_pool);
+    }
+    s->local_server = NULL;
+
+    log_debug(LOG_VERB, "transform to server '%.*s'",
+              s->pname.len, s->pname.data);
 
     return NC_OK;
 }
@@ -177,6 +198,7 @@ conf_pool_init(struct conf_pool *cp, struct string *name)
     cp->hash = CONF_UNSET_HASH;
     string_init(&cp->hash_tag);
     cp->distribution = CONF_UNSET_DIST;
+    cp->read_prefer = CONF_UNSET_READ_PREFER;
 
     cp->timeout = CONF_UNSET_NUM;
     cp->backlog = CONF_UNSET_NUM;
@@ -218,6 +240,7 @@ conf_pool_deinit(struct conf_pool *cp)
 
     string_deinit(&cp->listen.pname);
     string_deinit(&cp->listen.name);
+    string_deinit(&cp->hash_tag);
 
     while (array_n(&cp->server) != 0) {
         conf_server_deinit(array_pop(&cp->server));
@@ -266,6 +289,7 @@ conf_pool_each_transform(void *elem, void *data)
     sp->key_hash = hash_algos[cp->hash];
     sp->dist_type = cp->distribution;
     sp->hash_tag = cp->hash_tag;
+    sp->read_prefer = cp->read_prefer;
 
     sp->redis = cp->redis ? 1 : 0;
     sp->timeout = cp->timeout;
@@ -295,7 +319,7 @@ conf_dump(struct conf *cf)
 {
     uint32_t i, j, npool, nserver;
     struct conf_pool *cp;
-    struct string *s;
+    struct conf_server *s;
 
     npool = array_n(&cf->pool);
     if (npool == 0) {
@@ -317,6 +341,7 @@ conf_dump(struct conf *cf)
         log_debug(LOG_VVERB, "  hash_tag: \"%.*s\"", cp->hash_tag.len,
                   cp->hash_tag.data);
         log_debug(LOG_VVERB, "  distribution: %d", cp->distribution);
+        log_debug(LOG_VVERB, "  read_prefer: %d", cp->read_prefer);
         log_debug(LOG_VVERB, "  client_connections: %d",
                   cp->client_connections);
         log_debug(LOG_VVERB, "  redis: %d", cp->redis);
@@ -334,7 +359,9 @@ conf_dump(struct conf *cf)
 
         for (j = 0; j < nserver; j++) {
             s = array_get(&cp->server, j);
-            log_debug(LOG_VVERB, "    %.*s", s->len, s->data);
+            log_debug(LOG_VVERB, "    %.*s name:%.*s slave:%d local:%d",
+                      s->pname.len, s->pname.data, s->name.len, s->name.data,
+                      s->slave, s->local);
         }
     }
 }
@@ -496,7 +523,8 @@ conf_handler(struct conf *cf, void *data)
 
         rv = cmd->set(cf, cmd, data);
         if (rv != CONF_OK) {
-            log_error("conf: directive \"%.*s\" %s", key->len, key->data, rv);
+            log_error("conf: directive \"%.*s\" value \"%.*s\" %s",
+                      key->len, key->data, value->len, value->data, rv);
             return NC_ERROR;
         }
 
@@ -1113,8 +1141,19 @@ static int
 conf_server_name_cmp(const void *t1, const void *t2)
 {
     const struct conf_server *s1 = t1, *s2 = t2;
+    int result;
 
-    return string_compare(&s1->name, &s2->name);
+    /* order: name, slave, pname */
+
+    result = string_compare(&s1->name, &s2->name);
+    if (result != 0) {
+        return result;
+    }
+    result = s1->slave - s2->slave; /* master will before slave */
+    if (result != 0) {
+        return result;
+    }
+    return string_compare(&s1->pname, &s2->pname);
 }
 
 static int
@@ -1147,10 +1186,13 @@ conf_validate_server(struct conf *cf, struct conf_pool *cp)
     }
 
     /*
-     * Disallow duplicate servers - servers with identical "host:port:weight"
+     * Disallow duplicate masters - masters with identical "host:port:weight"
      * or "name" combination are considered as duplicates. When server name
      * is configured, we only check for duplicate "name" and not for duplicate
      * "host:port:weight"
+     *
+     * It's allowed that a shard has no master. In this case, write requests
+     * will fail
      */
     array_sort(&cp->server, conf_server_name_cmp);
     for (valid = true, i = 0; i < nserver - 1; i++) {
@@ -1159,10 +1201,22 @@ conf_validate_server(struct conf *cf, struct conf_pool *cp)
         cs1 = array_get(&cp->server, i);
         cs2 = array_get(&cp->server, i + 1);
 
-        if (string_compare(&cs1->name, &cs2->name) == 0) {
-            log_error("conf: pool '%.*s' has servers with same name '%.*s'",
-                      cp->name.len, cp->name.data, cs1->name.len, 
+        if (string_compare(&cs1->name, &cs2->name) == 0
+            && !cs1->slave && !cs2->slave) {
+            log_error("conf: pool '%.*s' '%.*s' is dulicated or has duplicate "
+                      "masters", cp->name.len, cp->name.data, cs1->name.len, 
                       cs1->name.data);
+            valid = false;
+            break;
+        }
+
+        /* If we have slaves, we will failover to other machines when some
+         * host is down.
+         * Original auto_eject_hosts strategy should not be used, which may
+         * eject the stub server and update pool. */
+        if ((cs1->slave || cs2->slave) && cp->auto_eject_hosts) {
+            log_error("conf: pool '%.*s' has slaves, auto_eject_hosts should "
+                      "be set to false", cp->name.len, cp->name.data);
             valid = false;
             break;
         }
@@ -1195,6 +1249,10 @@ conf_validate_pool(struct conf *cf, struct conf_pool *cp)
 
     if (cp->hash == CONF_UNSET_HASH) {
         cp->hash = CONF_DEFAULT_HASH;
+    }
+
+    if (cp->read_prefer == CONF_UNSET_READ_PREFER) {
+        cp->read_prefer = CONF_DEFAULT_READ_PREFER;
     }
 
     if (cp->timeout == CONF_UNSET_NUM) {
@@ -1470,13 +1528,12 @@ conf_add_server(struct conf *cf, struct command *cmd, void *conf)
     struct array *a;
     struct string *value;
     struct conf_server *field;
-    uint8_t *p, *q, *start;
-    uint8_t *pname, *addr, *port, *weight, *name;
-    uint32_t k, delimlen, pnamelen, addrlen, portlen, weightlen, namelen;
+    bool is_unix_socket;
+    uint8_t *p, *q, *start, *end;
+    uint8_t *pname, *addr, *port, *weight, *name, *role;
+    uint32_t k, len, pnamelen, addrlen, portlen, weightlen, namelen, rolelen;
     struct string address;
-    char delim[] = " ::";
 
-    string_init(&address);
     p = conf;
     a = (struct array *)(p + cmd->offset);
 
@@ -1488,81 +1545,116 @@ conf_add_server(struct conf *cf, struct command *cmd, void *conf)
     conf_server_init(field);
 
     value = array_top(&cf->arg);
+    is_unix_socket = (value->data[0] == '/' ? true : false);
 
-    /* parse "hostname:port:weight [name]" or "/path/unix_socket:weight [name]" from the end */
-    p = value->data + value->len - 1;
-    start = value->data;
+    /* parse "hostname:port:weight [name [master|slave]]"
+     * or "/path/unix_socket:weight [name [master|slave]]" from the begging */
+
+    p = value->data;
+    end = value->data + value->len;
+    pname = NULL;
+    pnamelen = 0;
+    name = NULL;
+    namelen = 0;
+    role = NULL;
+    rolelen = 0;
+
+    for (k = 0; ; k++) {
+        q = nc_strchr(p, end, ' ');
+        len = (uint32_t)((q != NULL ? q : end) - p);
+        switch (k) {
+        case 0:
+            pname = p;
+            pnamelen = len;
+            break;
+        case 1:
+            name = p;
+            namelen = len;
+            break;
+        case 2:
+            role = p;
+            rolelen = len;
+            break;
+        default:
+            NOT_REACHED();
+            break;
+        }
+        if (q == NULL) {
+            break;
+        } else {
+            p = q + 1;
+        }
+    }
+
+    if (k > 2 || pname == NULL || pnamelen == 0) {
+        return "has an invalid \"hostname:port:weight [name [role]]\" or "
+               "\"/path/unix_socket:weight [name [role]]\" format string";
+    }
+
+    /* parse hostname:port:weight or /path/unix_socket:weight from the end */
+
+    p = pname + pnamelen - 1;
+    start = pname;
     addr = NULL;
     addrlen = 0;
     weight = NULL;
     weightlen = 0;
     port = NULL;
     portlen = 0;
-    name = NULL;
-    namelen = 0;
 
-    delimlen = value->data[0] == '/' ? 2 : 3;
-
-    for (k = 0; k < sizeof(delim); k++) {
-        q = nc_strrchr(p, start, delim[k]);
+    for (k = 0; ; k++) {
+        q = nc_strrchr(p, start, ':');
         if (q == NULL) {
-            if (k == 0) {
-                /*
-                 * name in "hostname:port:weight [name]" format string is
-                 * optional
-                 */
-                continue;
-            }
             break;
         }
 
         switch (k) {
         case 0:
-            name = q + 1;
-            namelen = (uint32_t)(p - name + 1);
-            break;
-
-        case 1:
             weight = q + 1;
             weightlen = (uint32_t)(p - weight + 1);
             break;
-
-        case 2:
+        case 1:
             port = q + 1;
             portlen = (uint32_t)(p - port + 1);
             break;
-
         default:
             NOT_REACHED();
+            break;
         }
 
         p = q - 1;
     }
 
-    if (k != delimlen) {
-        return "has an invalid \"hostname:port:weight [name]\"or \"/path/unix_socket:weight [name]\" format string";
-    }
-
-    pname = value->data;
-    pnamelen = namelen > 0 ? value->len - (namelen + 1) : value->len;
-    status = string_copy(&field->pname, pname, pnamelen);
-    if (status != NC_OK) {
-        array_pop(a);
-        return CONF_ERROR;
-    }
-
+    /* the remaining part is the addr */
     addr = start;
     addrlen = (uint32_t)(p - start + 1);
 
-    field->weight = nc_atoi(weight, weightlen);
-    if (field->weight < 0) {
-        return "has an invalid weight in \"hostname:port:weight [name]\" format string";
+    if (k != (is_unix_socket ? 1 : 2) /* k should match delim times */
+        || (addr == NULL || addrlen == 0)
+        || (!is_unix_socket && (port == NULL || portlen == 0))
+        || (weight == NULL || weightlen == 0)) {
+        return "has an invalid \"hostname:port:weight\" or "
+               "\"/path/unix_socket:weight\" format string";
     }
 
-    if (value->data[0] != '/') {
+    /* now, check optional value and copy it */
+
+    status = string_copy(&field->pname, pname, pnamelen);
+    if (status != NC_OK) {
+        return CONF_ERROR;
+    }
+
+    field->weight = nc_atoi(weight, weightlen);
+    if (field->weight < 0) {
+        return "has an invalid weight in \"hostname:port:weight "
+               "[name [role]]\" format string";
+    }
+
+    if (!is_unix_socket) {
         field->port = nc_atoi(port, portlen);
         if (field->port < 0 || !nc_valid_port(field->port)) {
-            return "has an invalid port in \"hostname:port:weight [name]\" format string";
+            return "has an invalid port in \"hostname:port:weight "
+                   "[name [role]]\" format string";
         }
     }
 
@@ -1586,8 +1678,27 @@ conf_add_server(struct conf *cf, struct command *cmd, void *conf)
         return CONF_ERROR;
     }
 
+    if (role != NULL) {
+        if (nc_strncmp("master", role, rolelen) == 0) {
+            field->slave = 0;
+        } else if (nc_strncmp("slave", role, rolelen) == 0) {
+            field->slave = 1;
+        } else {
+            return "has an invalid role in \"hostname:port:weight "
+                   "[name [role]]\" format string";
+        }
+    }
+
+    /* resolve addr */
+
+    if (is_unix_socket || nc_is_local_addr((char*)addr, addrlen)) {
+        field->local = 1;
+    }
+
+    string_init(&address);
     status = string_copy(&address, addr, addrlen);
     if (status != NC_OK) {
+        string_deinit(&address);
         return CONF_ERROR;
     }
 
@@ -1742,4 +1853,33 @@ conf_set_hashtag(struct conf *cf, struct command *cmd, void *conf)
     }
 
     return CONF_OK;
+}
+
+char *
+conf_set_read_prefer(struct conf *cf, struct command *cmd, void *conf)
+{
+    uint8_t *p;
+    read_prefer_type_t *dp;
+    struct string *value, *it;
+
+    p = conf;
+    dp = (read_prefer_type_t *)(p + cmd->offset);
+
+    if (*dp != CONF_UNSET_READ_PREFER) {
+        return "is a duplicate";
+    }
+
+    value = array_top(&cf->arg);
+
+    for (it = read_prefer_strings; it->len != 0; it++) {
+        if (string_compare(value, it) != 0) {
+            continue;
+        }
+
+        *dp = it - read_prefer_strings;
+
+        return CONF_OK;
+    }
+
+    return "is not a valid read_prefer";
 }

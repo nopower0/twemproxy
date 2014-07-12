@@ -254,6 +254,8 @@ void rsp_recv_done(struct context *ctx, struct conn *conn, struct msg *msg, stru
 struct msg *rsp_send_next(struct context *ctx, struct conn *conn);
 void rsp_send_done(struct context *ctx, struct conn *conn, struct msg *msg);
 
+bool msg_type_check(void);
 const char * msg_type_string(msg_type_t type);
+bool msg_type_is_read(msg_type_t type);
 
 #endif
