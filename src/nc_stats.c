@@ -921,6 +921,8 @@ stats_send_rsp(struct stats *st)
         return NC_ERROR;
     }
 
+    // TODO is there a better way to avoid sending RST when closing
+    usleep(100 * 1000);
     close(sd);
 
     return NC_OK;
