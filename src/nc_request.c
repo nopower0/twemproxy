@@ -485,8 +485,12 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
         keylen = (uint32_t)(msg->key_end - msg->key_start);
     }
 
+    /*
+     * connection hint: c_conn->sd maybe biased after server connection error.
+     * so we use a random value before we have a better idea.
+     */
     s_conn = server_pool_conn(ctx, c_conn->owner, key, keylen,
-                              msg_type_is_read(msg->type), (uint32_t)c_conn->sd);
+                              msg_type_is_read(msg->type), (uint32_t)rand());
     if (s_conn == NULL) {
         req_forward_error(ctx, c_conn, msg);
         return;
