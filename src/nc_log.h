@@ -35,15 +35,18 @@
 #define LOG_MAX_LEN 256 /* max length of log message */
 
 struct logger {
-    char *name;  /* log file name */
-    int  level;  /* log level */
-    int  fd;     /* log file descriptor */
-    int  nerror; /* # log error */
-    int  limit;  /* # limit per 100ms per level */
-    int  access_sampling;    /* access sampling every n msg */
-    uint64_t access_counter; /* access counter */
-    int64_t last_time;       /* # last log time */
-    int  count[LOG_N_LEVEL]; /* # log per level */
+    char        *name;              /* log file name */
+    char        *full_name;         /* log file name with time */
+    size_t      nfull_name;         /* length of full name buf */
+    int64_t     full_name_time;     /* time for log file opened */
+    int         level;              /* log level */
+    int         fd;                 /* log file descriptor */
+    int         nerror;             /* # log error */
+    int         limit;              /* # limit per 100ms per level */
+    int         access_sampling;    /* access sampling every n msg */
+    uint64_t    access_counter;     /* access counter */
+    int64_t     last_count_time;    /* last log stat time */
+    int         count[LOG_N_LEVEL]; /* # log stat per level */
 };
 
 /*
@@ -67,6 +70,7 @@ struct logger {
 } while (0)
 
 #define loga(...) do {                                                      \
+    /* forbidden to call log_loggable to avoid recursively */               \
     _log(-1, __FILE__, __LINE__, 0, __VA_ARGS__);                           \
 } while (0)
 
@@ -159,8 +163,6 @@ void log_level_set(int level);
 void log_reopen(void);
 int log_loggable(int level);
 int log_access_loggable(int level);
-const char *_log_level_str(int level);
-bool _log_reach_limit(int level, int64_t usec);
 void _log(int level, const char *file, int line, int panic,
           const char *fmt, ...);
 void _log_stderr(const char *fmt, ...);

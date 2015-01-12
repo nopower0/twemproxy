@@ -34,6 +34,10 @@ log_init(int level, char *name, int limit, int access_sampling)
 
     l->level = MAX(LOG_EMERG, MIN(level, LOG_PVERB));
     l->name = name;
+    l->full_name = NULL;
+    l->nfull_name = 0;
+    l->full_name_time = 0;
+    l->fd = -1;
     l->limit = limit;
     l->access_sampling = access_sampling;
     l->access_counter = 0;
@@ -42,12 +46,13 @@ log_init(int level, char *name, int limit, int access_sampling)
     if (name == NULL || !strlen(name)) {
         l->fd = STDERR_FILENO;
     } else {
-        l->fd = open(name, O_WRONLY | O_APPEND | O_CREAT, 0644);
-        if (l->fd < 0) {
-            log_stderr("opening log file '%s' failed: %s", name,
-                       strerror(errno));
+        l->nfull_name = strlen(l->name) + 64;
+        l->full_name = nc_zalloc(l->nfull_name);
+        if (l->full_name == NULL) {
             return -1;
         }
+
+        log_reopen();
     }
 
     return 0;
@@ -65,18 +70,54 @@ log_deinit(void)
     close(l->fd);
 }
 
+static void
+log_full_name(void)
+{
+    struct logger *l = &logger;
+    char timestr[64];
+    int64_t now;
+    time_t now_t;
+    struct tm *local;
+
+    now = nc_usec_now();
+    now_t = now / 1000000;
+    local = localtime(&now_t);
+    strftime(timestr, sizeof(timestr), "%Y-%m-%d", local);
+
+    nc_scnprintf(l->full_name, l->nfull_name, "%s.%s", l->name, timestr);
+    l->full_name_time = now;
+}
+
+static void
+log_symlink(void)
+{
+    struct logger *l = &logger;
+    char cmd[1024];
+    nc_scnprintf(cmd, sizeof(cmd), "ln -sf `basename %s` %s",
+                 l->full_name, l->name);
+    if (system(cmd) < 0) {
+        log_stderr("opening log file '%s' failed: %s", l->full_name,
+                   strerror(errno));
+    }
+}
+
 void
 log_reopen(void)
 {
     struct logger *l = &logger;
 
     if (l->fd != STDERR_FILENO) {
-        close(l->fd);
-        l->fd = open(l->name, O_WRONLY | O_APPEND | O_CREAT, 0644);
+        if (l->fd > 0) {
+            close(l->fd);
+        }
+        log_full_name();
+        l->fd = open(l->full_name, O_WRONLY | O_APPEND | O_CREAT, 0644);
         if (l->fd < 0) {
-            log_stderr("reopening log file '%s' failed, ignored: %s", l->name,
+            log_stderr("opening log file '%s' failed: %s", l->full_name,
                        strerror(errno));
         }
+
+        log_symlink();
     }
 }
 
@@ -111,40 +152,8 @@ log_level_set(int level)
     loga("set log level to %d", l->level);
 }
 
-int
-log_loggable(int level)
-{
-    struct logger *l = &logger;
-    int64_t now;
-
-    if (level > l->level) {
-        return 0;
-    }
-
-    now = nc_usec_now();
-    if (level > 0 && level < LOG_N_LEVEL
-            && l->limit > 0 && _log_reach_limit(level, now)) {
-        return 0;
-    }
-
-    return 1;
-}
-
-int
-log_access_loggable(int level)
-{
-    struct logger *l = &logger;
-
-    if (level > l->level || l->access_sampling <= 0
-            || (l->access_counter++ % (uint64_t)l->access_sampling != 0)) {
-        return 0;
-    }
-
-    return 1;
-}
-
-const char *
-_log_level_str(int level)
+static const char *
+log_level_str(int level)
 {
     static const char * _level_str[] = {
         "0 EMERG",
@@ -168,8 +177,8 @@ _log_level_str(int level)
 }
 
 #define POSITIVE(n) ((n) > 0 ? (n) : 0)
-bool
-_log_reach_limit(int level, int64_t now)
+static bool
+log_reach_limit(int level, int64_t now)
 {
     struct logger *l = &logger;
     int suppressed;
@@ -177,7 +186,7 @@ _log_reach_limit(int level, int64_t now)
 
     /* the limit is controled by every 100ms, so we check the count and 
      * clear it every 100ms */
-    if (now / 100000 > l->last_time / 100000) {
+    if (now / 100000 > l->last_count_time / 100000) {
         suppressed = 0;
         i = 0;
         for (i = 0; i < LOG_N_LEVEL; ++i) {
@@ -203,7 +212,7 @@ _log_reach_limit(int level, int64_t now)
                  POSITIVE(l->count[11] - l->limit));
         }
         memset(&l->count, 0, sizeof(l->count));
-        l->last_time = now;
+        l->last_count_time = now;
     }
 
     l->count[level]++;
@@ -215,6 +224,59 @@ _log_reach_limit(int level, int64_t now)
     } else {
         return false;
     }
+}
+
+static void
+log_rename_check(int64_t now)
+{
+    struct logger *l = &logger;
+    int64_t rename_interval = 86400L * 1000000;  /* us */
+
+    if (l->fd != STDERR_FILENO) {
+        if (now / rename_interval > l->full_name_time / rename_interval) {
+            loga("log will be renamed");
+            log_reopen();
+        }
+    }
+}
+
+int
+log_loggable(int level)
+{
+    struct logger *l = &logger;
+    int64_t now;
+
+    if (l->fd < 0) { /* maybe a bad fd if reopen failed */
+        return 0;
+    }
+
+    if (level > l->level) {
+        return 0;
+    }
+
+    now = nc_usec_now();
+    if (level > 0 && level < LOG_N_LEVEL
+            && l->limit > 0 && log_reach_limit(level, now)) {
+        return 0;
+    }
+
+    /* log_rename_check cannot be called in _log, because it use _log inside */
+    log_rename_check(now);
+
+    return 1;
+}
+
+int
+log_access_loggable(int level)
+{
+    struct logger *l = &logger;
+
+    if (level > l->level || l->access_sampling <= 0
+            || (l->access_counter++ % (uint64_t)l->access_sampling != 0)) {
+        return 0;
+    }
+
+    return 1;
 }
 
 void
@@ -245,7 +307,7 @@ _log(int level, const char *file, int line, int panic, const char *fmt, ...)
 
     len += nc_scnprintf(buf + len, size - len, "%.*s.%06d %s %s:%d ",
                         strlen(timestr), timestr, now % 1000000,
-                        _log_level_str(level), file, line);
+                        log_level_str(level), file, line);
 
     va_start(args, fmt);
     len += nc_vscnprintf(buf + len, size - len, fmt, args);
