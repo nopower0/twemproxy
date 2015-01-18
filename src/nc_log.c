@@ -230,10 +230,11 @@ static void
 log_rename_check(int64_t now)
 {
     struct logger *l = &logger;
-    int64_t rename_interval = 86400L * 1000000;  /* us */
+    int64_t rename_interval = 86400L;  /* seconds */
 
     if (l->fd != STDERR_FILENO) {
-        if (now / rename_interval > l->full_name_time / rename_interval) {
+        if ((now / 1000000 - timezone) / rename_interval
+                > (l->full_name_time / 1000000 - timezone) / rename_interval) {
             loga("log will be renamed");
             log_reopen();
         }
