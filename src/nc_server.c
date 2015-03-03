@@ -769,7 +769,8 @@ server_pool_server_balance(struct server_pool *pool, struct server *stub,
      * 1. we prefer slave and it's a slave
      * 2. or we prefer none
      */
-    if (stub->local_server && stub->local_server->next_retry <= now
+    if (pool->read_local_first
+        && stub->local_server && stub->local_server->next_retry <= now
         && ((pool->read_prefer == READ_PREFER_SLAVE && stub->local_server->slave)
             || pool->read_prefer == READ_PREFER_NONE)) {
         log_debug(LOG_DEBUG, "read request balance to local server '%.*s'",

@@ -69,6 +69,10 @@ static struct command conf_commands[] = {
       conf_set_read_prefer,
       offsetof(struct conf_pool, read_prefer) },
 
+    { string("read_local_first"),
+      conf_set_bool,
+      offsetof(struct conf_pool, read_local_first) },
+
     { string("timeout"),
       conf_set_num,
       offsetof(struct conf_pool, timeout) },
@@ -199,6 +203,7 @@ conf_pool_init(struct conf_pool *cp, struct string *name)
     string_init(&cp->hash_tag);
     cp->distribution = CONF_UNSET_DIST;
     cp->read_prefer = CONF_UNSET_READ_PREFER;
+    cp->read_local_first = CONF_UNSET_NUM;
 
     cp->timeout = CONF_UNSET_NUM;
     cp->backlog = CONF_UNSET_NUM;
@@ -290,6 +295,7 @@ conf_pool_each_transform(void *elem, void *data)
     sp->dist_type = cp->distribution;
     sp->hash_tag = cp->hash_tag;
     sp->read_prefer = cp->read_prefer;
+    sp->read_local_first = cp->read_local_first;
 
     sp->redis = cp->redis ? 1 : 0;
     sp->timeout = cp->timeout;
@@ -342,6 +348,7 @@ conf_dump(struct conf *cf)
                   cp->hash_tag.data);
         log_debug(LOG_VVERB, "  distribution: %d", cp->distribution);
         log_debug(LOG_VVERB, "  read_prefer: %d", cp->read_prefer);
+        log_debug(LOG_VVERB, "  read_local_first: %d", cp->read_local_first);
         log_debug(LOG_VVERB, "  client_connections: %d",
                   cp->client_connections);
         log_debug(LOG_VVERB, "  redis: %d", cp->redis);
@@ -1253,6 +1260,10 @@ conf_validate_pool(struct conf *cf, struct conf_pool *cp)
 
     if (cp->read_prefer == CONF_UNSET_READ_PREFER) {
         cp->read_prefer = CONF_DEFAULT_READ_PREFER;
+    }
+
+    if (cp->read_local_first == CONF_UNSET_READ_PREFER) {
+        cp->read_local_first = CONF_DEFAULT_READ_LOCAL_FIRST;
     }
 
     if (cp->timeout == CONF_UNSET_NUM) {

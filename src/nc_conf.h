@@ -51,6 +51,7 @@ typedef enum read_prefer_type {
 #define CONF_DEFAULT_HASH                    HASH_FNV1A_64
 #define CONF_DEFAULT_DIST                    DIST_KETAMA
 #define CONF_DEFAULT_READ_PREFER             READ_PREFER_NONE
+#define CONF_DEFAULT_READ_LOCAL_FIRST        true
 #define CONF_DEFAULT_TIMEOUT                 -1
 #define CONF_DEFAULT_LISTEN_BACKLOG          512
 #define CONF_DEFAULT_CLIENT_CONNECTIONS      0
@@ -88,6 +89,7 @@ struct conf_pool {
     struct string      hash_tag;              /* hash_tag: */
     dist_type_t        distribution;          /* distribution: */
     read_prefer_type_t read_prefer;           /* read prefer master or slave */
+    int                read_local_first;      /* read local first */
     int                timeout;               /* timeout: */
     int                backlog;               /* backlog: */
     int                client_connections;    /* client_connections: */

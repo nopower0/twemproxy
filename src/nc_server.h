@@ -118,6 +118,7 @@ struct server_pool {
     hash_t             key_hash;             /* key hasher */
     struct string      hash_tag;             /* key hash tag (ref in conf_pool) */
     int                read_prefer;          /* read prefer (read_prefer_type_t) */
+    int                read_local_first;     /* read local first */
     int                timeout;              /* timeout in msec */
     int                backlog;              /* listen backlog */
     uint32_t           client_connections;   /* maximum # client connection */
