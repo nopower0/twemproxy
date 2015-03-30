@@ -932,6 +932,8 @@ redis_parse_req(struct msg *r)
         case SW_REQ_TYPE_LF:
             switch (ch) {
             case LF:
+                if (r->rnarg == 0)
+                        goto done;
                 if (redis_argeval(r)) {
                     state = SW_ARG1_LEN;
                 } else {
