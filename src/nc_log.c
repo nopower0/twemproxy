@@ -233,6 +233,7 @@ log_rename_check(int64_t now)
     int64_t rename_interval = 86400L;  /* seconds */
 
     if (l->fd != STDERR_FILENO) {
+        /* i.e. timezone is -28800 in Beijing */
         if ((now / 1000000 - timezone) / rename_interval
                 > (l->full_name_time / 1000000 - timezone) / rename_interval) {
             loga("log will be renamed");
