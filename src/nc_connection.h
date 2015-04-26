@@ -84,11 +84,13 @@ struct conn {
     unsigned           eof:1;         /* eof? aka passive close? */
     unsigned           done:1;        /* done? aka close? */
     unsigned           redis:1;       /* redis? */
+    unsigned           is_read:1;     /* is it for the read quest. */
 };
 
 TAILQ_HEAD(conn_tqh, conn);
 
 struct context *conn_to_ctx(struct conn *conn);
+struct conn *conn_get4(void *owner, bool client, bool redis, bool is_read);
 struct conn *conn_get(void *owner, bool client, bool redis);
 struct conn *conn_get_proxy(void *owner);
 void conn_put(struct conn *conn);

@@ -162,8 +162,10 @@ conf_server_transform(struct conf_server *cs, struct server *s, uint32_t nslave)
     s->addrlen = cs->info.addrlen;
     s->addr = (struct sockaddr *)&cs->info.addr;
 
-    s->ns_conn_q = 0;
-    TAILQ_INIT(&s->s_conn_q);
+    s->ns_conn_q_rd = 0;
+    TAILQ_INIT(&s->s_conn_q_rd);
+    s->ns_conn_q_wr = 0;
+    TAILQ_INIT(&s->s_conn_q_wr);
 
     s->next_retry = 0LL;
     s->failure_count = 0;

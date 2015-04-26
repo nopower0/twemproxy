@@ -164,7 +164,7 @@ _conn_get(void)
 }
 
 struct conn *
-conn_get(void *owner, bool client, bool redis)
+conn_get4(void *owner, bool client, bool redis, bool is_read)
 {
     struct conn *conn;
 
@@ -227,12 +227,19 @@ conn_get(void *owner, bool client, bool redis)
         conn->enqueue_outq = req_server_enqueue_omsgq;
         conn->dequeue_outq = req_server_dequeue_omsgq;
     }
+    conn->is_read = is_read;
 
     conn->ref(conn, owner);
 
     log_debug(LOG_VVERB, "get conn %p client %d", conn, conn->client);
 
     return conn;
+}
+
+struct conn *
+conn_get(void *owner, bool client, bool redis)
+{
+    return conn_get4(owner, client, redis, true);
 }
 
 struct conn *

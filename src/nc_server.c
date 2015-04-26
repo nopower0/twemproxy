@@ -37,9 +37,15 @@ server_ref(struct conn *conn, void *owner)
     conn->addrlen = server->addrlen;
     conn->addr = server->addr;
 
-    server->ns_conn_q++;
-    TAILQ_INSERT_TAIL(&server->s_conn_q, conn, conn_tqe);
-    ASSERT(!TAILQ_EMPTY(&server->s_conn_q));
+    if (conn->is_read) {
+        server->ns_conn_q_rd++;
+        TAILQ_INSERT_TAIL(&server->s_conn_q_rd, conn, conn_tqe);
+        ASSERT(!TAILQ_EMPTY(&server->s_conn_q_rd));
+    } else {
+        server->ns_conn_q_wr++;
+        TAILQ_INSERT_TAIL(&server->s_conn_q_wr, conn, conn_tqe);
+        ASSERT(!TAILQ_EMPTY(&server->s_conn_q_wr));
+    }
 
     conn->owner = owner;
 
@@ -58,9 +64,15 @@ server_unref(struct conn *conn)
     server = conn->owner;
     conn->owner = NULL;
 
-    ASSERT(server->ns_conn_q != 0);
-    server->ns_conn_q--;
-    TAILQ_REMOVE(&server->s_conn_q, conn, conn_tqe);
+    if (conn->is_read) {
+        ASSERT(server->ns_conn_q_rd != 0);
+        server->ns_conn_q_rd--;
+        TAILQ_REMOVE(&server->s_conn_q_rd, conn, conn_tqe);
+    } else {
+        ASSERT(server->ns_conn_q_wr != 0);
+        server->ns_conn_q_wr--;
+        TAILQ_REMOVE(&server->s_conn_q_wr, conn, conn_tqe);
+    }
 
     log_debug(LOG_VVERB, "unref conn %p owner %p from '%.*s'", conn, server,
               server->pname.len, server->pname.data);
@@ -228,12 +240,26 @@ server_deinit(struct array *server)
 }
 
 struct conn *
-server_conn(struct server *server)
+server_conn2(struct server *server, bool is_read)
 {
     struct server_pool *pool;
     struct conn *conn;
+    unsigned int max_connections;
+    uint32_t ns_conn_q;
+    struct conn_tqh *s_conn_q;
 
     pool = server->owner;
+    if (is_read) {
+        max_connections = pool->server_connections - 1;
+        ns_conn_q = server->ns_conn_q_rd;
+        s_conn_q = &server->s_conn_q_rd;
+    } else {
+        max_connections = 1;
+        ns_conn_q = server->ns_conn_q_wr;
+        s_conn_q = &server->s_conn_q_wr;
+    }
+    if (max_connections < 1)
+        max_connections = 1;
 
     /*
      * FIXME: handle multiple server connections per server and do load
@@ -241,22 +267,28 @@ server_conn(struct server *server)
      * 'server_connections:' > 0 key
      */
 
-    if (server->ns_conn_q < pool->server_connections) {
-        return conn_get(server, false, pool->redis);
+    if (ns_conn_q < max_connections) {
+        return conn_get4(server, false, pool->redis, is_read);
     }
-    ASSERT(server->ns_conn_q == pool->server_connections);
+    ASSERT(ns_conn_q == max_connections);
 
     /*
      * Pick a server connection from the head of the queue and insert
      * it back into the tail of queue to maintain the lru order
      */
-    conn = TAILQ_FIRST(&server->s_conn_q);
+    conn = TAILQ_FIRST(s_conn_q);
     ASSERT(!conn->client && !conn->proxy);
 
-    TAILQ_REMOVE(&server->s_conn_q, conn, conn_tqe);
-    TAILQ_INSERT_TAIL(&server->s_conn_q, conn, conn_tqe);
+    TAILQ_REMOVE(s_conn_q, conn, conn_tqe);
+    TAILQ_INSERT_TAIL(s_conn_q, conn, conn_tqe);
 
     return conn;
+}
+
+struct conn *
+server_conn(struct server *server)
+{
+    return server_conn2(server, true);
 }
 
 static rstatus_t
@@ -294,12 +326,21 @@ server_each_disconnect(void *elem, void *data)
     server = elem;
     pool = server->owner;
 
-    while (!TAILQ_EMPTY(&server->s_conn_q)) {
+    while (!TAILQ_EMPTY(&server->s_conn_q_rd)) {
         struct conn *conn;
 
-        ASSERT(server->ns_conn_q > 0);
+        ASSERT(server->ns_conn_q_rd > 0);
 
-        conn = TAILQ_FIRST(&server->s_conn_q);
+        conn = TAILQ_FIRST(&server->s_conn_q_rd);
+        conn->close(pool->ctx, conn);
+    }
+
+    while (!TAILQ_EMPTY(&server->s_conn_q_wr)) {
+        struct conn *conn;
+
+        ASSERT(server->ns_conn_q_wr > 0);
+
+        conn = TAILQ_FIRST(&server->s_conn_q_wr);
         conn->close(pool->ctx, conn);
     }
 
@@ -847,7 +888,7 @@ server_pool_conn(struct context *ctx, struct server_pool *pool, uint8_t *key,
     }
 
     /* pick a connection to a given server */
-    conn = server_conn(server);
+    conn = server_conn2(server, is_read);
     if (conn == NULL) {
         return NULL;
     }

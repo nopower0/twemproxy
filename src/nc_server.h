@@ -79,8 +79,10 @@ struct server {
     socklen_t          addrlen;       /* socket length */
     struct sockaddr    *addr;         /* socket address (ref in conf_server) */
 
-    uint32_t           ns_conn_q;     /* # server connection */
-    struct conn_tqh    s_conn_q;      /* server connection q */
+    uint32_t           ns_conn_q_wr;  /* # server connection for write */
+    struct conn_tqh    s_conn_q_wr;   /* server connection q for write */
+    uint32_t           ns_conn_q_rd;  /* # server connection for read*/
+    struct conn_tqh    s_conn_q_rd;   /* server connection q for read */
 
     int64_t            next_retry;    /* next retry time in usec */
     uint32_t           failure_count; /* # consecutive failures */
@@ -137,6 +139,7 @@ int server_timeout(struct conn *conn);
 bool server_active(struct conn *conn);
 rstatus_t server_init(struct array *server, struct array *conf_server, struct server_pool *sp);
 void server_deinit(struct array *server);
+struct conn *server_conn2(struct server *server, bool is_read);
 struct conn *server_conn(struct server *server);
 rstatus_t server_connect(struct context *ctx, struct server *server, struct conn *conn);
 void server_close(struct context *ctx, struct conn *conn);
