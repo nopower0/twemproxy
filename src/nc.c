@@ -61,6 +61,7 @@ static struct option long_options[] = {
     { "test-conf",      no_argument,        NULL,   't' },
     { "daemonize",      no_argument,        NULL,   'd' },
     { "describe-stats", no_argument,        NULL,   'D' },
+    { "reuse-port",     no_argument,        NULL,   'R' },
     { "verbose",        required_argument,  NULL,   'v' },
     { "output",         required_argument,  NULL,   'o' },
     { "output-limit",   required_argument,  NULL,   'l' },
@@ -74,7 +75,7 @@ static struct option long_options[] = {
     { NULL,             0,                  NULL,    0  }
 };
 
-static char short_options[] = "hVtdDv:o:l:r:c:s:i:a:p:m:";
+static char short_options[] = "hVtdDRv:o:l:r:c:s:i:a:p:m:";
 
 static rstatus_t
 nc_daemonize(int dump_core)
@@ -222,7 +223,8 @@ nc_show_usage(void)
         "  -V, --version          : show version and exit" CRLF
         "  -t, --test-conf        : test configuration for syntax errors and exit" CRLF
         "  -d, --daemonize        : run as a daemon" CRLF
-        "  -D, --describe-stats   : print stats description and exit");
+        "  -D, --describe-stats   : print stats description and exit" CRLF
+        "  -R, --reuse-port       : reuse the listen port");
     log_stderr(
         "  -v, --verbosity=N      : set logging level (default: %d, min: %d, max: %d)" CRLF
         "  -o, --output=S         : set logging file (default: %s)" CRLF
@@ -316,6 +318,8 @@ nc_set_default_options(struct instance *nci)
     nci->pid = (pid_t)-1;
     nci->pid_filename = NULL;
     nci->pidfile = 0;
+
+    nci->reuse_port = 0;
 }
 
 static rstatus_t
@@ -354,6 +358,10 @@ nc_get_options(int argc, char **argv, struct instance *nci)
             describe_stats = 1;
             show_version = 1;
             break;
+
+	case 'R':
+	    nci->reuse_port = 1;
+	    break;
 
         case 'v':
             value = nc_atoi(optarg, strlen(optarg));

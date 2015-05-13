@@ -89,7 +89,7 @@ proxy_close(struct context *ctx, struct conn *conn)
 }
 
 static rstatus_t
-proxy_reuse(struct conn *p)
+proxy_reuse(struct conn *p, unsigned reuse_port)
 {
     rstatus_t status;
     struct sockaddr_un *un;
@@ -98,6 +98,8 @@ proxy_reuse(struct conn *p)
     case AF_INET:
     case AF_INET6:
         status = nc_set_reuseaddr(p->sd);
+	if (status == 0 && reuse_port)
+		status = nc_set_reuseport(p->sd);
         break;
 
     case AF_UNIX:
@@ -133,7 +135,7 @@ proxy_listen(struct context *ctx, struct conn *p)
         return NC_ERROR;
     }
 
-    status = proxy_reuse(p);
+    status = proxy_reuse(p, ctx->reuse_port);
     if (status < 0) {
         log_error("reuse of addr '%.*s' for listening on p %d failed: %s",
                   pool->addrstr.len, pool->addrstr.data, p->sd,

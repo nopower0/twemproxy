@@ -129,6 +129,7 @@ struct context {
     uint32_t           rlimit_nofile;           /* rlimit # file */
     uint32_t           max_client_connections;  /* max # client connections */
     uint32_t           max_server_connections;  /* max # server connections */
+    unsigned           reuse_port:1;            /* reuse listen port */
 };
 
 struct instance {
@@ -146,6 +147,7 @@ struct instance {
     pid_t           pid;                         /* process id */
     char            *pid_filename;               /* pid filename */
     unsigned        pidfile:1;                   /* pid file created? */
+    unsigned        reuse_port:1;                /* reuse listen port? */
 };
 
 struct context *core_start(struct instance *nci);

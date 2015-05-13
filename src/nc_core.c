@@ -63,6 +63,7 @@ core_ctx_create(struct instance *nci)
     ctx->rlimit_nofile = 0;
     ctx->max_client_connections = 0;
     ctx->max_server_connections = 0;
+    ctx->reuse_port = nci->reuse_port;
 
     /* parse and create configuration */
     ctx->cf = conf_create(nci->conf_filename);
