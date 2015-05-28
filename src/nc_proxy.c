@@ -302,9 +302,8 @@ proxy_accept(struct context *ctx, struct conn *p)
                 log_crit("connections status: rlimit nofile %d, "
                          "used connections: %d, max client connections %d, "
                          "curr client connections %d", ctx->rlimit_nofile,
-                         conn_curr_connections(), ctx->max_client_connections,
-                         conn_curr_client_connections());
-                /* Since we maintain a safe max_client_connections and check
+                         conn_ncurr(), ctx->max_ncconn, conn_ncurr_cconn());
+                /* Since we maintain a safe max_ncconn and check
                  * it after every accept, we should not reach here.
                  * So we will panic after this log */
                 log_panic("HIT MAX OPEN FILES, IT SHOULD NOT HAPPEN. ABORT.");
@@ -319,12 +318,11 @@ proxy_accept(struct context *ctx, struct conn *p)
         break;
     }
 
-    if (conn_curr_client_connections() >= (int)ctx->max_client_connections) {
+    if (conn_ncurr_cconn() >= ctx->max_ncconn) {
         stats_pool_incr(ctx, p->owner, rejected_connections);
 
         log_crit("client connections %d exceed limit %d",
-                 conn_curr_client_connections(),
-                 ctx->max_client_connections);
+                 conn_ncurr_cconn(), ctx->max_ncconn);
         status = close(sd);
         if (status < 0) {
             log_error("close c %d failed, ignored: %s", sd, strerror(errno));

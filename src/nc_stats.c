@@ -393,23 +393,31 @@ stats_create_buf(struct stats *st)
     size += int64_max_digits + 1 + 6; /* plus '.' + len of tv_sec.tv_usec */
     size += key_value_extra;
 
-    size += st->total_connections_str.len;
+    size += st->ntotal_conn_str.len;
     size += int64_max_digits;
     size += key_value_extra;
 
-    size += st->curr_connections_str.len;
+    size += st->ncurr_conn_str.len;
     size += int64_max_digits;
     size += key_value_extra;
 
-    size += st->free_connections_str.len;
+    size += st->nfree_conn_str.len;
     size += int64_max_digits;
     size += key_value_extra;
 
-    size += st->free_msgs_str.len;
+    size += st->ntotal_msg_str.len;
     size += int64_max_digits;
     size += key_value_extra;
 
-    size += st->free_mbufs_str.len;
+    size += st->nfree_msg_str.len;
+    size += int64_max_digits;
+    size += key_value_extra;
+
+    size += st->ntotal_mbuf_str.len;
+    size += int64_max_digits;
+    size += key_value_extra;
+
+    size += st->nfree_mbuf_str.len;
     size += int64_max_digits;
     size += key_value_extra;
 
@@ -612,32 +620,37 @@ stats_add_header(struct stats *st)
         return status;
     }
 
-    status = stats_add_num(st, &st->total_connections_str,
-                           conn_total_connections());
+    status = stats_add_num(st, &st->ntotal_conn_str, (int64_t)conn_ntotal());
     if (status != NC_OK) {
         return status;
     }
 
-    status = stats_add_num(st, &st->curr_connections_str,
-                           conn_curr_connections());
+    status = stats_add_num(st, &st->ncurr_conn_str, conn_ncurr());
     if (status != NC_OK) {
         return status;
     }
 
-    status = stats_add_num(st, &st->free_connections_str,
-                           conn_free_connections());
+    status = stats_add_num(st, &st->nfree_conn_str, conn_nfree());
     if (status != NC_OK) {
         return status;
     }
 
-    status = stats_add_num(st, &st->free_msgs_str,
-                           msg_nfree());
+    status = stats_add_num(st, &st->ntotal_msg_str, (int64_t)msg_ntotal());
     if (status != NC_OK) {
         return status;
     }
 
-    status = stats_add_num(st, &st->free_mbufs_str,
-                           mbuf_nfree());
+    status = stats_add_num(st, &st->nfree_msg_str, msg_nfree());
+    if (status != NC_OK) {
+        return status;
+    }
+
+    status = stats_add_num(st, &st->ntotal_mbuf_str, (int64_t)mbuf_ntotal());
+    if (status != NC_OK) {
+        return status;
+    }
+
+    status = stats_add_num(st, &st->nfree_mbuf_str, mbuf_nfree());
     if (status != NC_OK) {
         return status;
     }
@@ -1104,11 +1117,13 @@ stats_create(uint16_t stats_port, char *stats_ip, int stats_interval,
     string_set_text(&st->timestamp_str, "timestamp");
     string_set_text(&st->rusage_user_str, "rusage_user");
     string_set_text(&st->rusage_system_str, "rusage_system");
-    string_set_text(&st->total_connections_str, "total_connections");
-    string_set_text(&st->curr_connections_str, "curr_connections");
-    string_set_text(&st->free_connections_str, "free_connections");
-    string_set_text(&st->free_msgs_str, "free_msgs");
-    string_set_text(&st->free_mbufs_str, "free_mbufs");
+    string_set_text(&st->ntotal_conn_str, "total_connections");
+    string_set_text(&st->ncurr_conn_str, "curr_connections");
+    string_set_text(&st->nfree_conn_str, "free_connections");
+    string_set_text(&st->ntotal_msg_str, "total_msgs");
+    string_set_text(&st->nfree_msg_str, "free_msgs");
+    string_set_text(&st->ntotal_mbuf_str, "total_mbufs");
+    string_set_text(&st->nfree_mbuf_str, "free_mbufs");
 
     /* for server header */
     string_set_text(&st->name_str, "name");

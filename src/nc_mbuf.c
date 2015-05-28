@@ -22,6 +22,7 @@
 
 static uint32_t nfree_mbufq;   /* # free mbuf */
 static struct mhdr free_mbufq; /* free mbuf q */
+static uint64_t ntotal_mbuf;   /* total # mbuf counter from start */
 
 static size_t mbuf_chunk_size; /* mbuf chunk size - header + data (const) */
 static size_t mbuf_offset;     /* mbuf offset in chunk (const) */
@@ -47,6 +48,7 @@ _mbuf_get(void)
     if (buf == NULL) {
         return NULL;
     }
+    ntotal_mbuf++;
 
     /*
      * mbuf header is at the tail end of the mbuf. This enables us to catch
@@ -284,7 +286,12 @@ mbuf_deinit(void)
     ASSERT(nfree_mbufq == 0);
 }
 
-int mbuf_nfree(void)
+uint32_t mbuf_nfree(void)
 {
-    return (int)nfree_mbufq;
+    return nfree_mbufq;
+}
+
+uint64_t mbuf_ntotal(void)
+{
+    return ntotal_mbuf;
 }

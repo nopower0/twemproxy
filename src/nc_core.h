@@ -127,8 +127,8 @@ struct context {
     int                timeout;     /* timeout in msec */
 
     uint32_t           rlimit_nofile;           /* rlimit # file */
-    uint32_t           max_client_connections;  /* max # client connections */
-    uint32_t           max_server_connections;  /* max # server connections */
+    uint32_t           max_ncconn;  /* max # client connections */
+    uint32_t           max_nsconn;  /* max # server connections */
     unsigned           reuse_port:1;            /* reuse listen port */
 };
 

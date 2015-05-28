@@ -115,12 +115,14 @@ struct stats {
     struct string       uptime_str;     /* uptime string */
     struct string       timestamp_str;  /* timestamp string */
     struct string       rusage_user_str;/* rusage user */
-    struct string       rusage_system_str;      /* rusage user */
-    struct string       total_connections_str;  /* total_connections string */
-    struct string       curr_connections_str;   /* curr_connections string */
-    struct string       free_connections_str;   /* free_connections string */
-    struct string       free_msgs_str;  /* free_msgs string */
-    struct string       free_mbufs_str; /* free_mbufs string */
+    struct string       rusage_system_str;  /* rusage user */
+    struct string       ntotal_conn_str;/* ntotal_conn string */
+    struct string       ncurr_conn_str; /* ncurr_conn string */
+    struct string       nfree_conn_str; /* nfree_conn string */
+    struct string       ntotal_msg_str; /* ntotal_msg string */
+    struct string       nfree_msg_str;  /* nfree_msg string */
+    struct string       ntotal_mbuf_str;/* ntotal_mbuf string */
+    struct string       nfree_mbuf_str; /* nfree_mbuf string */
 
     struct string       name_str;       /* name string (for server header) */
     struct string       pname_str;      /* pname string (for server header) */

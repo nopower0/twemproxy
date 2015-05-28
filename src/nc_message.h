@@ -224,7 +224,8 @@ void msg_tmo_delete(struct msg *msg);
 
 void msg_init(void);
 void msg_deinit(void);
-int msg_nfree(void);
+uint32_t msg_nfree(void);
+uint64_t msg_ntotal(void);
 struct msg *msg_get(struct conn *conn, bool request, bool redis);
 void msg_put(struct msg *msg);
 struct msg *msg_get_error(bool redis, err_t err);

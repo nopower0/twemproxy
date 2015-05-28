@@ -34,11 +34,9 @@ core_calc_connections(struct context *ctx)
     }
 
     ctx->rlimit_nofile = (uint32_t)limit.rlim_cur;
-    ctx->max_client_connections = 
-        ctx->rlimit_nofile - ctx->max_server_connections - RESERVED_FDS;
-    log_notice("current rlimit nofile %d, max_server_connections %d, "
-               "max_client_connections %d", ctx->rlimit_nofile,
-               ctx->max_server_connections, ctx->max_client_connections);
+    ctx->max_ncconn = ctx->rlimit_nofile - ctx->max_nsconn - RESERVED_FDS;
+    log_notice("current rlimit nofile %d, max_nsconn %d, max_ncconn %d",
+               ctx->rlimit_nofile, ctx->max_nsconn, ctx->max_ncconn);
 
     return NC_OK;
 }
@@ -61,8 +59,8 @@ core_ctx_create(struct instance *nci)
     ctx->max_timeout = nci->stats_interval;
     ctx->timeout = ctx->max_timeout;
     ctx->rlimit_nofile = 0;
-    ctx->max_client_connections = 0;
-    ctx->max_server_connections = 0;
+    ctx->max_ncconn = 0;
+    ctx->max_nsconn = 0;
     ctx->reuse_port = nci->reuse_port;
 
     /* parse and create configuration */

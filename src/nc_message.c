@@ -113,6 +113,7 @@ static uint64_t msg_id;          /* message id counter */
 static uint64_t frag_id;         /* fragment id counter */
 static uint32_t nfree_msgq;      /* # free msg q */
 static struct msg_tqh free_msgq; /* free msg q */
+static uint64_t ntotal_msg;      /* total # message counter from start */
 static struct rbtree tmo_rbt;    /* timeout rbtree */
 static struct rbnode tmo_rbs;    /* timeout rbtree sentinel */
 
@@ -201,6 +202,7 @@ _msg_get(void)
     if (msg == NULL) {
         return NULL;
     }
+    ntotal_msg++;
 
 done:
     /* c_tqe, s_tqe, and m_tqe are left uninitialized */
@@ -408,9 +410,14 @@ msg_deinit(void)
     ASSERT(nfree_msgq == 0);
 }
 
-int msg_nfree(void)
+uint32_t msg_nfree(void)
 {
-    return (int)nfree_msgq;
+    return nfree_msgq;
+}
+
+uint64_t msg_ntotal(void)
+{
+    return ntotal_msg;
 }
 
 bool

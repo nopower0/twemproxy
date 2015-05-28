@@ -53,7 +53,8 @@ mbuf_full(struct mbuf *mbuf)
 
 void mbuf_init(struct instance *nci);
 void mbuf_deinit(void);
-int mbuf_nfree(void);
+uint32_t mbuf_nfree(void);
+uint64_t mbuf_ntotal(void);
 struct mbuf *mbuf_get(void);
 void mbuf_put(struct mbuf *mbuf);
 void mbuf_rewind(struct mbuf *mbuf);
