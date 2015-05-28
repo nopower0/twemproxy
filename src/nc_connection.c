@@ -434,6 +434,11 @@ conn_curr_connections(void)
     return curr_connections;
 }
 
+int conn_free_connections(void)
+{
+    return (int)nfree_connq;
+}
+
 int64_t
 conn_total_connections(void)
 {

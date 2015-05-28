@@ -118,6 +118,9 @@ struct stats {
     struct string       rusage_system_str;      /* rusage user */
     struct string       total_connections_str;  /* total_connections string */
     struct string       curr_connections_str;   /* curr_connections string */
+    struct string       free_connections_str;   /* free_connections string */
+    struct string       free_msgs_str;  /* free_msgs string */
+    struct string       free_mbufs_str; /* free_mbufs string */
 
     struct string       name_str;       /* name string (for server header) */
     struct string       pname_str;      /* pname string (for server header) */

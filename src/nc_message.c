@@ -408,6 +408,11 @@ msg_deinit(void)
     ASSERT(nfree_msgq == 0);
 }
 
+int msg_nfree(void)
+{
+    return (int)nfree_msgq;
+}
+
 bool
 msg_empty(struct msg *msg)
 {

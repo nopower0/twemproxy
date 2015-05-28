@@ -1264,7 +1264,7 @@ conf_validate_pool(struct conf *cf, struct conf_pool *cp)
         cp->read_prefer = CONF_DEFAULT_READ_PREFER;
     }
 
-    if (cp->read_local_first == CONF_UNSET_READ_PREFER) {
+    if (cp->read_local_first == CONF_UNSET_NUM) {
         cp->read_local_first = CONF_DEFAULT_READ_LOCAL_FIRST;
     }
 

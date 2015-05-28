@@ -401,6 +401,18 @@ stats_create_buf(struct stats *st)
     size += int64_max_digits;
     size += key_value_extra;
 
+    size += st->free_connections_str.len;
+    size += int64_max_digits;
+    size += key_value_extra;
+
+    size += st->free_msgs_str.len;
+    size += int64_max_digits;
+    size += key_value_extra;
+
+    size += st->free_mbufs_str.len;
+    size += int64_max_digits;
+    size += key_value_extra;
+
     /* server pools */
     for (i = 0; i < array_n(&st->sum); i++) {
         struct stats_pool *stp = array_get(&st->sum, i);
@@ -608,6 +620,24 @@ stats_add_header(struct stats *st)
 
     status = stats_add_num(st, &st->curr_connections_str,
                            conn_curr_connections());
+    if (status != NC_OK) {
+        return status;
+    }
+
+    status = stats_add_num(st, &st->free_connections_str,
+                           conn_free_connections());
+    if (status != NC_OK) {
+        return status;
+    }
+
+    status = stats_add_num(st, &st->free_msgs_str,
+                           msg_nfree());
+    if (status != NC_OK) {
+        return status;
+    }
+
+    status = stats_add_num(st, &st->free_mbufs_str,
+                           mbuf_nfree());
     if (status != NC_OK) {
         return status;
     }
@@ -1076,6 +1106,9 @@ stats_create(uint16_t stats_port, char *stats_ip, int stats_interval,
     string_set_text(&st->rusage_system_str, "rusage_system");
     string_set_text(&st->total_connections_str, "total_connections");
     string_set_text(&st->curr_connections_str, "curr_connections");
+    string_set_text(&st->free_connections_str, "free_connections");
+    string_set_text(&st->free_msgs_str, "free_msgs");
+    string_set_text(&st->free_mbufs_str, "free_mbufs");
 
     /* for server header */
     string_set_text(&st->name_str, "name");

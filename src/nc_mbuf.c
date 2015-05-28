@@ -283,3 +283,8 @@ mbuf_deinit(void)
     }
     ASSERT(nfree_mbufq == 0);
 }
+
+int mbuf_nfree(void)
+{
+    return (int)nfree_mbufq;
+}
