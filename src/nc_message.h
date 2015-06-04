@@ -222,7 +222,7 @@ struct msg *msg_tmo_min(void);
 void msg_tmo_insert(struct msg *msg, struct conn *conn);
 void msg_tmo_delete(struct msg *msg);
 
-void msg_init(void);
+void msg_init(struct instance *nci);
 void msg_deinit(void);
 uint32_t msg_nfree(void);
 uint64_t msg_ntotal(void);

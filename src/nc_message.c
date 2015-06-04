@@ -116,6 +116,7 @@ static struct msg_tqh free_msgq; /* free msg q */
 static uint64_t ntotal_msg;      /* total # message counter from start */
 static struct rbtree tmo_rbt;    /* timeout rbtree */
 static struct rbnode tmo_rbs;    /* timeout rbtree sentinel */
+static size_t msg_free_limit;    /* msg free limit */
 
 static struct msg *
 msg_from_rbe(struct rbnode *node)
@@ -187,7 +188,7 @@ msg_tmo_delete(struct msg *msg)
 static struct msg *
 _msg_get(void)
 {
-    struct msg *msg;
+    struct msg *msg, *tmp_msg;
 
     if (!TAILQ_EMPTY(&free_msgq)) {
         ASSERT(nfree_msgq > 0);
@@ -195,6 +196,13 @@ _msg_get(void)
         msg = TAILQ_FIRST(&free_msgq);
         nfree_msgq--;
         TAILQ_REMOVE(&free_msgq, msg, m_tqe);
+
+        if (msg_free_limit != 0 && nfree_msgq > msg_free_limit) {
+            tmp_msg = TAILQ_FIRST(&free_msgq);
+            nfree_msgq--;
+            TAILQ_REMOVE(&free_msgq, tmp_msg, m_tqe);
+        }
+
         goto done;
     }
 
@@ -386,7 +394,7 @@ msg_dump(struct msg *msg)
 }
 
 void
-msg_init(void)
+msg_init(struct instance *nci)
 {
     log_debug(LOG_DEBUG, "msg size %d", sizeof(struct msg));
     msg_id = 0;
@@ -394,6 +402,9 @@ msg_init(void)
     nfree_msgq = 0;
     TAILQ_INIT(&free_msgq);
     rbtree_init(&tmo_rbt, &tmo_rbs);
+
+    msg_free_limit = nci->mbuf_free_limit; /* use mbuf_free_limit */
+    log_debug(LOG_DEBUG, "msg free limit %zu", msg_free_limit);
 }
 
 void

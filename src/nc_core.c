@@ -160,7 +160,7 @@ core_start(struct instance *nci)
     }
 
     mbuf_init(nci);
-    msg_init();
+    msg_init(nci);
     conn_init();
 
     ctx = core_ctx_create(nci);

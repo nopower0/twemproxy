@@ -26,6 +26,7 @@ static uint64_t ntotal_mbuf;   /* total # mbuf counter from start */
 
 static size_t mbuf_chunk_size; /* mbuf chunk size - header + data (const) */
 static size_t mbuf_offset;     /* mbuf offset in chunk (const) */
+static size_t mbuf_free_limit; /* mbuf free limit */
 
 static struct mbuf *
 _mbuf_get(void)
@@ -39,6 +40,11 @@ _mbuf_get(void)
         mbuf = STAILQ_FIRST(&free_mbufq);
         nfree_mbufq--;
         STAILQ_REMOVE_HEAD(&free_mbufq, next);
+
+        if (mbuf_free_limit != 0 && nfree_mbufq > mbuf_free_limit) {
+            nfree_mbufq--;
+            STAILQ_REMOVE_HEAD(&free_mbufq, next);
+        }
 
         ASSERT(mbuf->magic == MBUF_MAGIC);
         goto done;
@@ -269,9 +275,10 @@ mbuf_init(struct instance *nci)
 
     mbuf_chunk_size = nci->mbuf_chunk_size;
     mbuf_offset = mbuf_chunk_size - MBUF_HSIZE;
+    mbuf_free_limit = nci->mbuf_free_limit;
 
-    log_debug(LOG_DEBUG, "mbuf hsize %d chunk size %zu offset %zu length %zu",
-              MBUF_HSIZE, mbuf_chunk_size, mbuf_offset, mbuf_offset);
+    log_debug(LOG_DEBUG, "mbuf hsize %d chunk size %zu offset %zu length %zu free limit %zu",
+              MBUF_HSIZE, mbuf_chunk_size, mbuf_offset, mbuf_offset, mbuf_free_limit);
 }
 
 void
