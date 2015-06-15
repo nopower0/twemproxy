@@ -118,6 +118,8 @@ static struct rbtree tmo_rbt;    /* timeout rbtree */
 static struct rbnode tmo_rbs;    /* timeout rbtree sentinel */
 static size_t msg_free_limit;    /* msg free limit */
 
+static void msg_free(struct msg *msg);
+
 static struct msg *
 msg_from_rbe(struct rbnode *node)
 {
@@ -201,6 +203,7 @@ _msg_get(void)
             tmp_msg = TAILQ_FIRST(&free_msgq);
             nfree_msgq--;
             TAILQ_REMOVE(&free_msgq, tmp_msg, m_tqe);
+            msg_free(tmp_msg);
         }
 
         goto done;

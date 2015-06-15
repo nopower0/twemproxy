@@ -28,10 +28,12 @@ static size_t mbuf_chunk_size; /* mbuf chunk size - header + data (const) */
 static size_t mbuf_offset;     /* mbuf offset in chunk (const) */
 static size_t mbuf_free_limit; /* mbuf free limit */
 
+static void mbuf_free(struct mbuf *mbuf);
+
 static struct mbuf *
 _mbuf_get(void)
 {
-    struct mbuf *mbuf;
+    struct mbuf *mbuf, *tmp_mbuf;
     uint8_t *buf;
 
     if (!STAILQ_EMPTY(&free_mbufq)) {
@@ -42,8 +44,10 @@ _mbuf_get(void)
         STAILQ_REMOVE_HEAD(&free_mbufq, next);
 
         if (mbuf_free_limit != 0 && nfree_mbufq > mbuf_free_limit) {
+            tmp_mbuf = STAILQ_FIRST(&free_mbufq);
             nfree_mbufq--;
             STAILQ_REMOVE_HEAD(&free_mbufq, next);
+            mbuf_free(tmp_mbuf);
         }
 
         ASSERT(mbuf->magic == MBUF_MAGIC);
