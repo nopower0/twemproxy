@@ -187,15 +187,18 @@ rsp_filter(struct context *ctx, struct conn *conn, struct msg *msg)
     ASSERT(pmsg->request && !pmsg->done);
 
     if (pmsg->swallow) {
+	int64_t timeo = pmsg->tmo_rbe.key;
         conn->dequeue_outq(ctx, conn, pmsg);
         pmsg->done = 1;
         if (pmsg->frag_owner) {
             pmsg->frag_owner->nfrag_done++;
         }
 
+	struct server *server = conn->owner;
+	int64_t time = nc_msec_now() + server_timeout(conn) - timeo;
         log_info("swallow rsp %"PRIu64" len %"PRIu32" of req "
-                 "%"PRIu64" on s %d", msg->id, msg->mlen, pmsg->id,
-                 conn->sd);
+                 "%"PRIu64" on s %d s %s t %"PRId64, msg->id, msg->mlen, pmsg->id,
+                 conn->sd, server->pname.data, time);
 
         rsp_put(msg);
         req_put(pmsg);
@@ -215,7 +218,7 @@ rsp_forward_stats(struct context *ctx, struct server *server, struct msg *msg)
 }
 
 static void
-rsp_forward_log(struct msg *req_msg, struct msg *rsp_msg)
+rsp_forward_log(struct msg *req_msg, struct msg *rsp_msg, int64_t timeo)
 {
     if (req_msg == NULL || rsp_msg == NULL) {
         return;
@@ -226,12 +229,15 @@ rsp_forward_log(struct msg *req_msg, struct msg *rsp_msg)
     }
 
     uint32_t key_len = (uint32_t)(req_msg->key_end - req_msg->key_start);
-    log_access("ACCESS %s %s %.*s%s rb %"PRIu32" sb %"PRIu32" e %d",
+    struct server *server = rsp_msg->owner->owner;
+    int64_t time = nc_msec_now() + server_timeout(rsp_msg->owner) - timeo;
+    log_access("ACCESS %s %s %.*s%s rb %"PRIu32" sb %"PRIu32" e %d s %s t %"PRId64,
          nc_unresolve_peer_desc(c_conn->sd), 
          msg_type_string(req_msg->type),
          (key_len < 512 ? key_len : 512), req_msg->key_start,
          (key_len > 512 ? "..." : ""),
-         req_msg->mlen, rsp_msg->mlen, req_msg->error);
+         req_msg->mlen, rsp_msg->mlen, req_msg->error, server->pname.data,
+         timeo ? time : timeo);
 } 
 
 static void
@@ -251,6 +257,7 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
     ASSERT(pmsg != NULL && pmsg->peer == NULL);
     ASSERT(pmsg->request && !pmsg->done);
 
+    int64_t timeo = pmsg->tmo_rbe.key;
     s_conn->dequeue_outq(ctx, s_conn, pmsg);
     pmsg->done = 1;
     if (pmsg->frag_owner) {
@@ -273,7 +280,7 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
         }
         
         // print request and response info into access log
-        rsp_forward_log(pmsg, msg);
+        rsp_forward_log(pmsg, msg, timeo);
     }
 
     rsp_forward_stats(ctx, s_conn->owner, msg);
@@ -347,7 +354,7 @@ rsp_send_next(struct context *ctx, struct conn *conn)
         stats_pool_incr(ctx, conn->owner, forward_error);
         
         // print request and response info into access log
-        rsp_forward_log(pmsg, msg);
+        rsp_forward_log(pmsg, msg, 0);
     } else {
         msg = pmsg->peer;
     }
