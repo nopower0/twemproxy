@@ -271,6 +271,7 @@ done:
     msg->last_fragment = 0;
     msg->swallow = 0;
     msg->redis = 0;
+    msg->sending = 0;
 
     return msg;
 }
@@ -826,6 +827,8 @@ msg_send_chain(struct context *ctx, struct conn *conn, struct msg *msg)
         /* message has been sent completely, finalize it */
         if (mbuf == NULL) {
             conn->send_done(ctx, conn, msg);
+        } else {
+            msg->sending = true;
         }
     }
 
