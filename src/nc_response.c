@@ -229,14 +229,19 @@ rsp_forward_log(struct msg *req_msg, struct msg *rsp_msg, int64_t timeo)
     }
 
     uint32_t key_len = (uint32_t)(req_msg->key_end - req_msg->key_start);
-    struct server *server = rsp_msg->owner->owner;
-    int64_t time = nc_msec_now() + server_timeout(rsp_msg->owner) - timeo;
+    struct server *server = NULL;
+    int64_t time = 0;
+    if (rsp_msg->owner) {
+        server = rsp_msg->owner->owner;
+        time = nc_msec_now() + server_timeout(rsp_msg->owner) - timeo;
+    }
     log_access("ACCESS %s %s %.*s%s rb %"PRIu32" sb %"PRIu32" e %d s %s t %"PRId64,
          nc_unresolve_peer_desc(c_conn->sd), 
          msg_type_string(req_msg->type),
          (key_len < 512 ? key_len : 512), req_msg->key_start,
          (key_len > 512 ? "..." : ""),
-         req_msg->mlen, rsp_msg->mlen, req_msg->error, server->pname.data,
+         req_msg->mlen, rsp_msg->mlen, req_msg->error,
+         server ? server->pname.data : "",
          timeo ? time : timeo);
 } 
 
