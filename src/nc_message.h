@@ -214,6 +214,7 @@ struct msg {
     unsigned             last_fragment:1; /* last fragment? */
     unsigned             swallow:1;       /* swallow response? */
     unsigned             redis:1;         /* redis? */
+    unsigned             sending:1;       /* sending? */
 };
 
 TAILQ_HEAD(msg_tqh, msg);

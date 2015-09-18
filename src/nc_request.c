@@ -547,21 +547,45 @@ req_send_next(struct context *ctx, struct conn *conn)
         server_connected(ctx, conn);
     }
 
-    nmsg = TAILQ_FIRST(&conn->imsg_q);
-    if (nmsg == NULL) {
-        /* nothing to send as the server inq is empty */
-        status = event_del_out(ctx->evb, conn);
-        if (status != NC_OK) {
-            conn->err = errno;
-        }
+    for (;;) {
+        nmsg = TAILQ_FIRST(&conn->imsg_q);
+        if (nmsg == NULL) {
+            /* nothing to send as the server inq is empty */
+            status = event_del_out(ctx->evb, conn);
+            if (status != NC_OK) {
+                conn->err = errno;
+            }
 
-        return NULL;
+            return NULL;
+        }
+        if (nmsg->swallow && !nmsg->sending) {
+            log_info("ignore swallowed req %"PRIu64" len %"PRIu32
+                     " type %d on s %d", nmsg->id, nmsg->mlen, nmsg->type,
+                     conn->sd);
+            conn->dequeue_inq(ctx, conn, nmsg);
+            req_put(nmsg);
+        } else {
+            break;
+        }
     }
 
     msg = conn->smsg;
     if (msg != NULL) {
         ASSERT(msg->request && !msg->done);
-        nmsg = TAILQ_NEXT(msg, s_tqe);
+        for (;;) {
+            nmsg = TAILQ_NEXT(msg, s_tqe);
+            if (!nmsg)
+                break;
+            if (nmsg->swallow && !nmsg->sending) {
+                log_info("ignore swallowed req %"PRIu64
+                         " len %"PRIu32" type %d on s %d", nmsg->id,
+                         nmsg->mlen, nmsg->type, conn->sd);
+                conn->dequeue_inq(ctx, conn, nmsg);
+                req_put(nmsg);
+            } else {
+                break;
+            }
+        }
     }
 
     conn->smsg = nmsg;
@@ -588,6 +612,8 @@ req_send_done(struct context *ctx, struct conn *conn, struct msg *msg)
 
     log_debug(LOG_VVERB, "send done req %"PRIu64" len %"PRIu32" type %d on "
               "s %d", msg->id, msg->mlen, msg->type, conn->sd);
+
+    msg->sending = false;
 
     /* dequeue the message (request) from server inq */
     conn->dequeue_inq(ctx, conn, msg);
