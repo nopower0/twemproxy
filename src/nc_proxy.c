@@ -265,13 +265,16 @@ proxy_accept(struct context *ctx, struct conn *p)
     rstatus_t status;
     struct conn *c;
     int sd;
+    struct sockaddr_storage addr;
+    socklen_t addr_len;
 
     ASSERT(p->proxy && !p->client);
     ASSERT(p->sd > 0);
     ASSERT(p->recv_active && p->recv_ready);
 
     for (;;) {
-        sd = accept(p->sd, NULL, NULL);
+        addr_len = sizeof(addr);
+        sd = accept(p->sd, (struct sockaddr *)&addr, &addr_len);
         if (sd < 0) {
             if (errno == EINTR) {
                 log_debug(LOG_VERB, "accept on p %d not ready - eintr", p->sd);
@@ -341,6 +344,10 @@ proxy_accept(struct context *ctx, struct conn *p)
         return NC_ENOMEM;
     }
     c->sd = sd;
+    c->family = addr.ss_family;
+    c->addrlen = addr_len;
+    c->ss = addr;
+    c->addr = (struct sockaddr *)&c->ss;
 
     stats_pool_incr(ctx, c->owner, client_connections);
 

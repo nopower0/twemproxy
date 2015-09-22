@@ -297,6 +297,7 @@ conf_pool_each_transform(void *elem, void *data)
     sp->dist_type = cp->distribution;
     sp->hash_tag = cp->hash_tag;
     sp->read_prefer = cp->read_prefer;
+    sp->read_prefer_lpm_mask = cp->read_prefer_lpm_mask;
     sp->read_local_first = cp->read_local_first;
 
     sp->redis = cp->redis ? 1 : 0;
@@ -349,7 +350,12 @@ conf_dump(struct conf *cf)
         log_debug(LOG_VVERB, "  hash_tag: \"%.*s\"", cp->hash_tag.len,
                   cp->hash_tag.data);
         log_debug(LOG_VVERB, "  distribution: %d", cp->distribution);
-        log_debug(LOG_VVERB, "  read_prefer: %d", cp->read_prefer);
+        if (cp->read_prefer == READ_PREFER_LPM) {
+                log_debug(LOG_VVERB, "  read_prefer: lpm/%d",
+                          33 - ffs(cp->read_prefer_lpm_mask));
+        } else {
+                log_debug(LOG_VVERB, "  read_prefer: %d", cp->read_prefer);
+        }
         log_debug(LOG_VVERB, "  read_local_first: %d", cp->read_local_first);
         log_debug(LOG_VVERB, "  client_connections: %d",
                   cp->client_connections);
@@ -1883,6 +1889,17 @@ conf_set_read_prefer(struct conf *cf, struct command *cmd, void *conf)
     }
 
     value = array_top(&cf->arg);
+
+    if (value->len > 4 && nc_strncmp(value->data, "lpm/", 4) == 0) {
+        struct conf_pool *cp = conf;
+        int i = atoi((char *)value->data + 4);
+        if (i < 0 || i > 32)
+            return "invalid lpm";
+        *dp = READ_PREFER_LPM;
+        cp->read_prefer_lpm_mask = ~((1ull << (32 - i)) - 1);
+
+        return CONF_OK;
+    }
 
     for (it = read_prefer_strings; it->len != 0; it++) {
         if (string_compare(value, it) != 0) {

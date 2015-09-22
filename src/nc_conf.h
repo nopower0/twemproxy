@@ -29,7 +29,8 @@
 typedef enum read_prefer_type {
     READ_PREFER_NONE,
     READ_PREFER_MASTER,
-    READ_PREFER_SLAVE
+    READ_PREFER_SLAVE,
+    READ_PREFER_LPM,
 } read_prefer_type_t;
 
 #define CONF_OK             (void *) NULL
@@ -89,6 +90,7 @@ struct conf_pool {
     struct string      hash_tag;              /* hash_tag: */
     dist_type_t        distribution;          /* distribution: */
     read_prefer_type_t read_prefer;           /* read prefer master or slave */
+    uint32_t           read_prefer_lpm_mask;  /* mask for read_prefer: lpm */
     int                read_local_first;      /* read local first */
     int                timeout;               /* timeout: */
     int                backlog;               /* backlog: */

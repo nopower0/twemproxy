@@ -120,6 +120,7 @@ struct server_pool {
     hash_t             key_hash;             /* key hasher */
     struct string      hash_tag;             /* key hash tag (ref in conf_pool) */
     int                read_prefer;          /* read prefer (read_prefer_type_t) */
+    uint32_t           read_prefer_lpm_mask; /* read perfer: lpm mask */
     int                read_local_first;     /* read local first */
     int                timeout;              /* timeout in msec */
     int                backlog;              /* listen backlog */
@@ -148,7 +149,7 @@ void server_ok(struct context *ctx, struct conn *conn);
 
 struct conn *server_pool_conn(struct context *ctx, struct server_pool *pool,
                               uint8_t *key, uint32_t keylen, bool is_read,
-                              uint32_t hint);
+                              uint32_t hint, struct conn *c);
 rstatus_t server_pool_run(struct server_pool *pool);
 rstatus_t server_pool_preconnect(struct context *ctx);
 void server_pool_disconnect(struct context *ctx);

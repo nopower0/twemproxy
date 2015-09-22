@@ -770,9 +770,23 @@ server_pool_server(struct server_pool *pool, uint8_t *key, uint32_t keylen)
     return server;
 }
 
+static inline bool lpm_match(struct server_pool *pool,
+                             struct server *server, struct conn *conn) {
+    ASSERT(conn->client);
+    ASSERT(conn->family == AF_INET);
+    ASSERT(conn->addr->sa_family == AF_INET);
+    struct sockaddr_in *clnt_addr = (struct sockaddr_in *)conn->addr;
+    ASSERT(server->family == AF_INET);
+    ASSERT(server->addr->sa_family == AF_INET);
+    struct sockaddr_in *serv_addr = (struct sockaddr_in *)server->addr;
+
+    return (ntohl(clnt_addr->sin_addr.s_addr ^ serv_addr->sin_addr.s_addr) &
+            pool->read_prefer_lpm_mask) == 0;
+}
+
 static struct server *
 server_pool_server_balance(struct server_pool *pool, struct server *stub,
-                           bool is_read, uint32_t hint)
+                           bool is_read, uint32_t hint, struct conn *conn)
 {
     int64_t now;
     if (!is_read) { /* write request */
@@ -830,6 +844,25 @@ server_pool_server_balance(struct server_pool *pool, struct server *stub,
      * 2. or stub is master and we don't prefer the slave
      */
     num = 0;
+    if (pool->read_prefer == READ_PREFER_LPM) {
+        if (stub->next_retry <= now && lpm_match(pool, stub, conn))
+            candidates[num++] = stub;
+        for (i = 0; i < array_n(&stub->slave_pool); i++) {
+            struct server *s = array_get(&stub->slave_pool, i);
+            if (num >= SERVER_MAX_CANDIDATES)
+                break;
+            if (s->next_retry <= now && lpm_match(pool, s, conn))
+                candidates[num++] = s;
+        }
+        if (num > 0) {
+            struct server *s = candidates[hint % num];
+            log_debug(LOG_DEBUG, "read request balance to server '%.*s' "
+                      "hint %"PRIu32" by lpm", s->pname.len,
+                      s->pname.data, hint);
+            return s;
+        }
+        num = 0;
+    }
     if (stub->next_retry <= now && (stub->slave
         || (!stub->slave && pool->read_prefer != READ_PREFER_SLAVE))) {
         candidates[num++] = stub;
@@ -865,7 +898,7 @@ server_pool_server_balance(struct server_pool *pool, struct server *stub,
 
 struct conn *
 server_pool_conn(struct context *ctx, struct server_pool *pool, uint8_t *key,
-                 uint32_t keylen, bool is_read, uint32_t hint)
+                 uint32_t keylen, bool is_read, uint32_t hint, struct conn *c)
 {
     rstatus_t status;
     struct server *server;
@@ -883,7 +916,7 @@ server_pool_conn(struct context *ctx, struct server_pool *pool, uint8_t *key,
     }
 
     /* route read request to slaves if possible */
-    server = server_pool_server_balance(pool, server, is_read, hint);
+    server = server_pool_server_balance(pool, server, is_read, hint, c);
     if (server == NULL) {
         return NULL;
     }

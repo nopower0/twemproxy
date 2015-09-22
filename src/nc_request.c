@@ -490,7 +490,8 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
      * so we use a random value before we have a better idea.
      */
     s_conn = server_pool_conn(ctx, c_conn->owner, key, keylen,
-                              msg_type_is_read(msg->type), (uint32_t)rand());
+                              msg_type_is_read(msg->type), (uint32_t)rand(),
+                              c_conn);
     if (s_conn == NULL) {
         req_forward_error(ctx, c_conn, msg);
         return;
