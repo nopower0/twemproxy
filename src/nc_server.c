@@ -230,7 +230,8 @@ server_deinit(struct array *server)
         struct server *s;
 
         s = array_pop(server);
-        ASSERT(TAILQ_EMPTY(&s->s_conn_q) && s->ns_conn_q == 0);
+        ASSERT(TAILQ_EMPTY(&s->s_conn_q_rd) && s->ns_conn_q_rd == 0);
+        ASSERT(TAILQ_EMPTY(&s->s_conn_q_wr) && s->ns_conn_q_wr == 0);
 
         server_deinit(&s->slave_pool);
         array_deinit(&s->slave_pool);
