@@ -130,6 +130,7 @@ struct context {
     uint32_t           max_ncconn;  /* max # client connections */
     uint32_t           max_nsconn;  /* max # server connections */
     unsigned           reuse_port:1;            /* reuse listen port */
+    unsigned           no_async:1;              /* no async request */
 };
 
 struct instance {
@@ -149,6 +150,7 @@ struct instance {
     char            *pid_filename;               /* pid filename */
     unsigned        pidfile:1;                   /* pid file created? */
     unsigned        reuse_port:1;                /* reuse listen port? */
+    unsigned        no_async:1;                  /* no async request */
 };
 
 struct context *core_start(struct instance *nci);

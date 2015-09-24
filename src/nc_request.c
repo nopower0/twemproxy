@@ -345,7 +345,7 @@ req_recv_next(struct context *ctx, struct conn *conn, bool alloc)
          * half (by sending the second FIN) when the client has no
          * outstanding requests
          */
-        if (!conn->active(conn)) {
+        if (ctx->no_async || !conn->active(conn)) {
             conn->done = 1;
             log_info("c %d is done", conn->sd);
         }
