@@ -63,6 +63,7 @@ core_ctx_create(struct instance *nci)
     ctx->max_nsconn = 0;
     ctx->reuse_port = nci->reuse_port;
     ctx->no_async = nci->no_async;
+    ctx->lpm_mask = nci->lpm_mask;
 
     /* parse and create configuration */
     ctx->cf = conf_create(nci->conf_filename);

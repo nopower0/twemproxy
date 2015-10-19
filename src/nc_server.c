@@ -770,7 +770,7 @@ server_pool_server(struct server_pool *pool, uint8_t *key, uint32_t keylen)
     return server;
 }
 
-static inline bool lpm_match(struct server_pool *pool,
+static inline bool lpm_match(uint32_t lpm_mask,
                              struct server *server, struct conn *conn) {
     ASSERT(conn->client);
     ASSERT(conn->family == AF_INET);
@@ -781,7 +781,7 @@ static inline bool lpm_match(struct server_pool *pool,
     struct sockaddr_in *serv_addr = (struct sockaddr_in *)server->addr;
 
     return (ntohl(clnt_addr->sin_addr.s_addr ^ serv_addr->sin_addr.s_addr) &
-            pool->read_prefer_lpm_mask) == 0;
+            lpm_mask) == 0;
 }
 
 static struct server *
@@ -837,56 +837,45 @@ server_pool_server_balance(struct server_pool *pool, struct server *stub,
     /* now, we try to filter servers available and select it based on client */
 
     struct server *candidates[SERVER_MAX_CANDIDATES] = {NULL};
-    uint32_t i, num;
-    /*
-     * Add stub into candidates, if
-     * 1. stub is slave
-     * 2. or stub is master and we don't prefer the slave
-     */
-    num = 0;
-    if (pool->read_prefer == READ_PREFER_LPM) {
-        if (stub->next_retry <= now && lpm_match(pool, stub, conn))
+    uint32_t i, num, lpm_mask = pool->ctx->lpm_mask;
+    for (;;) {
+        num = 0;
+        /*
+         * Add stub into candidates, if
+         * 1. stub is slave
+         * 2. or stub is master and we don't prefer the slave
+         */
+        if (stub->next_retry <= now && (stub->slave
+            || (!stub->slave && pool->read_prefer != READ_PREFER_SLAVE)) &&
+            lpm_match(lpm_mask, stub, conn)) {
             candidates[num++] = stub;
-        for (i = 0; i < array_n(&stub->slave_pool); i++) {
-            struct server *s = array_get(&stub->slave_pool, i);
-            if (num >= SERVER_MAX_CANDIDATES)
-                break;
-            if (s->next_retry <= now && lpm_match(pool, s, conn))
-                candidates[num++] = s;
+            log_debug(LOG_VERB, "read request balance add candidate '%.*s'",
+                      stub->pname.len, stub->pname.data);
         }
+        for (i = 0; i < array_n(&stub->slave_pool); i++) {
+            if (num >= SERVER_MAX_CANDIDATES) {
+                break;
+            }
+            struct server *s = array_get(&stub->slave_pool, i);
+            ASSERT(s != NULL);
+            if (s->next_retry <= now && lpm_match(lpm_mask, s, conn)) {
+                candidates[num++] = s;
+                log_debug(LOG_VERB, "read request balance add candidate '%.*s'",
+                          s->pname.len, s->pname.data);
+            }
+        }
+
         if (num > 0) {
             struct server *s = candidates[hint % num];
             log_debug(LOG_DEBUG, "read request balance to server '%.*s' "
-                      "hint %"PRIu32" by lpm", s->pname.len,
-                      s->pname.data, hint);
+                      "hint %"PRIu32" lpm_mask %"PRIx32, s->pname.len,
+                      s->pname.data, hint, lpm_mask);
             return s;
         }
-        num = 0;
-    }
-    if (stub->next_retry <= now && (stub->slave
-        || (!stub->slave && pool->read_prefer != READ_PREFER_SLAVE))) {
-        candidates[num++] = stub;
-        log_debug(LOG_VERB, "read request balance add candidate '%.*s'",
-                  stub->pname.len, stub->pname.data);
-    }
-    for (i = 0; i < array_n(&stub->slave_pool); i++) {
-        if (num >= SERVER_MAX_CANDIDATES) {
-            break;
-        }
-        struct server *s = array_get(&stub->slave_pool, i);
-        ASSERT(s != NULL);
-        if (s->next_retry <= now) {
-            candidates[num++] = s;
-            log_debug(LOG_VERB, "read request balance add candidate '%.*s'",
-                      s->pname.len, s->pname.data);
-        }
-    }
 
-    if (num > 0) {
-        struct server *s = candidates[hint % num];
-        log_debug(LOG_DEBUG, "read request balance to server '%.*s' "
-                  "hint %"PRIu32"", s->pname.len, s->pname.data, hint);
-        return s;
+        if (lpm_mask == 0)
+            break;
+        lpm_mask = 0;
     }
 
     /* Failover to stub if no server is available. Maybe stub is in failure,

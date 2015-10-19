@@ -75,10 +75,11 @@ static struct option long_options[] = {
     { "pid-file",       required_argument,  NULL,   'p' },
     { "mbuf-size",      required_argument,  NULL,   'm' },
     { "mbuf-nfree",     required_argument,  NULL,   'f' },
+    { "lpm",            required_argument,  NULL,   'L' },
     { NULL,             0,                  NULL,    0  }
 };
 
-static char short_options[] = "hVtdDRNv:o:l:r:c:s:i:a:p:m:f:";
+static char short_options[] = "hVtdDRNv:o:l:r:c:s:i:a:p:m:f:L:";
 
 static rstatus_t
 nc_daemonize(int dump_core)
@@ -242,6 +243,7 @@ nc_show_usage(void)
         "  -p, --pid-file=S       : set pid file (default: %s)" CRLF
         "  -m, --mbuf-size=N      : set size of mbuf chunk in bytes (default: %d bytes)" CRLF
         "  -f, --mbuf-free-limit=N: set mbuf free limit (default: %d)" CRLF
+        "  -L, --lpm=N            : set LPM bits (default: 0, min: 0, max: 32)" CRLF
         "",
         NC_LOG_DEFAULT, NC_LOG_MIN, NC_LOG_MAX,
         NC_LOG_PATH != NULL ? NC_LOG_PATH : "stderr",
@@ -327,6 +329,7 @@ nc_set_default_options(struct instance *nci)
 
     nci->reuse_port = 0;
     nci->no_async = 0;
+    nci->lpm_mask = 0;
 }
 
 static rstatus_t
@@ -455,6 +458,15 @@ nc_get_options(int argc, char **argv, struct instance *nci)
                 return NC_ERROR;
             }
             nci->mbuf_free_limit = (size_t)value;
+            break;
+
+        case 'L':
+            value = nc_atoi(optarg, strlen(optarg));
+            if (value < 0 || value > 32) {
+                log_stderr("nutcracker: option -L requires a number in [0,32]");
+                return NC_ERROR;
+            }
+            nci->lpm_mask = ~((1ull << (32 - value)) - 1);
             break;
 
         case '?':
