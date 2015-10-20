@@ -273,8 +273,7 @@ proxy_accept(struct context *ctx, struct conn *p)
     ASSERT(p->recv_active && p->recv_ready);
 
     for (;;) {
-        addr_len = sizeof(addr);
-        sd = accept(p->sd, (struct sockaddr *)&addr, &addr_len);
+        sd = accept(p->sd, NULL, NULL);
         if (sd < 0) {
             if (errno == EINTR) {
                 log_debug(LOG_VERB, "accept on p %d not ready - eintr", p->sd);
@@ -316,6 +315,12 @@ proxy_accept(struct context *ctx, struct conn *p)
 
             log_error("accept on p %d failed: %s", p->sd, strerror(errno));
             return NC_ERROR;
+        }
+        addr_len = sizeof(addr);
+        if (getsockname(sd, (struct sockaddr *)&addr, &addr_len)) {
+            log_error("getsockname on p %d failed: %s", p->sd, strerror(errno));
+            close(sd);
+            continue;
         }
 
         break;
