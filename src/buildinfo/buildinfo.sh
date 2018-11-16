@@ -7,7 +7,8 @@ git_commit=$(git rev-parse --short HEAD 2>/dev/null || echo '0000000')
 #git_commit=`(git show-ref --head --hash=8 2>/dev/null || echo '0000000') | head -n1`
 
 git_dirty=$(git diff -U0 --no-ext-diff HEAD 2>/dev/null | wc -l)
+git_dirty_without_space="$(echo -e "${git_dirty}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 
 date=$(date +%Y%m%d_%H%M%S)
 
-echo "${date}_${git_branch}_${git_commit}_dirty_${git_dirty}"
+echo "${date}_${git_branch}_${git_commit}_dirty_${git_dirty_without_space}"
